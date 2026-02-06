@@ -1,0 +1,155 @@
+services:
+  postgres:
+    labels:
+      - "com.thmanyah.project=content-platform"
+    image: postgres:18.1-alpine
+    container_name: thmanyah-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: thmanyah
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - thmanyah-network
+
+  redis:
+    labels:
+      - "com.thmanyah.project=content-platform"
+    image: redis:8.4.0-alpine
+    container_name: thmanyah-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - thmanyah-network
+
+  typesense:
+    labels:
+      - "com.thmanyah.project=content-platform"
+    image: typesense/typesense:30.1
+    container_name: thmanyah-typesense
+    environment:
+      TYPESENSE_API_KEY: xyz
+    ports:
+      - "8108:8108"
+    volumes:
+      - typesense_data:/data
+    command: "--api-key=xyz --data-dir=/data --enable-cors"
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 nc -z localhost 8108 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - thmanyah-network
+
+  cms-api:
+    labels:
+      - "com.thmanyah.project=content-platform"
+    build:
+      context: .
+      dockerfile: cmd/cms-api/Dockerfile
+    container_name: thmanyah-cms-api
+    environment:
+      SERVICE_NAME: thmanyah-cms-api
+      PORT: 8080
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/thmanyah?sslmode=disable
+      REDIS_ADDR: redis:6379
+      TYPESENSE_ADDRESS: http://typesense:8108
+      TYPESENSE_API_KEY: xyz
+      JWT_SECRET: your-secret-key-here
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - thmanyah-network
+
+  discovery-api:
+    labels:
+      - "com.thmanyah.project=content-platform"
+    build:
+      context: .
+      dockerfile: cmd/discovery-api/Dockerfile
+    container_name: thmanyah-discovery-api
+    environment:
+      SERVICE_NAME: thmanyah-discovery-api
+      PORT: 8081
+      TYPESENSE_ADDRESS: http://typesense:8108
+      TYPESENSE_API_KEY: xyz
+    ports:
+      - "8081:8081"
+    depends_on:
+      typesense:
+        condition: service_started
+    networks:
+      - thmanyah-network
+
+  outbox-relay:
+    labels:
+      - "com.thmanyah.project=content-platform"
+    build:
+      context: .
+      dockerfile: cmd/outbox-relay/Dockerfile
+    container_name: thmanyah-outbox-relay
+    environment:
+      SERVICE_NAME: thmanyah-outbox-relay
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/thmanyah?sslmode=disable
+      REDIS_ADDR: redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - thmanyah-network
+
+  search-indexer:
+    labels:
+      - "com.thmanyah.project=content-platform"
+    build:
+      context: .
+      dockerfile: cmd/search-indexer/Dockerfile
+    container_name: thmanyah-search-indexer
+    environment:
+      SERVICE_NAME: thmanyah-search-indexer
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/thmanyah?sslmode=disable
+      REDIS_ADDR: redis:6379
+      TYPESENSE_ADDRESS: http://typesense:8108
+      TYPESENSE_API_KEY: xyz
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      typesense:
+        condition: service_started
+    networks:
+      - thmanyah-network
+
+volumes:
+  postgres_data:
+    labels:
+      - "com.thmanyah.project=content-platform"
+  typesense_data:
+    labels:
+      - "com.thmanyah.project=content-platform"
+
+networks:
+  thmanyah-network:
+    driver: bridge

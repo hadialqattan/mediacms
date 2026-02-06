@@ -1,0 +1,45 @@
+version: "3"
+
+tasks:
+  # Go commands.
+  build:
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/cms-api ./cmd/cms-api
+      - go build -o bin/discovery-api ./cmd/discovery-api
+      - go build -o bin/outbox-relay ./cmd/outbox-relay
+      - go build -o bin/search-indexer ./cmd/search-indexer
+
+  test:
+    cmds:
+      - go test -v ./tests/integration/...
+
+  # Database commands.
+  sqlc:
+    cmds:
+      - cd internal/cms && sqlc generate
+      - cd internal/outboxrelay && sqlc generate
+      - cd internal/searchindexer && sqlc generate
+
+  migrate:
+    cmds:
+      - migrate -path migrations -database "postgres://postgres:postgres@localhost:5432/thmanyah?sslmode=disable" up
+
+  # Docker commands.
+  up:
+    cmds:
+      - docker compose up -d --build
+
+  down:
+    cmds:
+      - docker compose down
+
+  logs:
+    cmds:
+      - docker compose logs -f
+
+  purge:
+    cmds:
+      - docker compose down -v
+      - docker container ls -aq -f label=com.thmanyah.project=content-platform | xargs -r docker container rm -f
+      - docker volume ls -q -f label=com.thmanyah.project=content-platform | xargs -r docker volume rm -f
