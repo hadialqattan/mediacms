@@ -65,14 +65,14 @@ func (w *Worker) HandleProgramDelete(ctx context.Context, t *asynq.Task) error {
 	return nil
 }
 
-func NewWorkerAndMux(worker *Worker) (*asynq.Server, *asynq.ServeMux) {
+func NewWorkerAndMux(worker *Worker, redisAddr string) (*asynq.Server, *asynq.ServeMux) {
 	mux := asynq.NewServeMux()
 
 	mux.HandleFunc(string(domain.OutboxEventTypeProgramUpsert), worker.HandleProgramUpsert)
 	mux.HandleFunc(string(domain.OutboxEventTypeProgramDelete), worker.HandleProgramDelete)
 
 	server := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: "localhost:6379"},
+		asynq.RedisClientOpt{Addr: redisAddr},
 		asynq.Config{
 			Concurrency: 1,
 			Queues: map[string]int{

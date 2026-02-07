@@ -24,7 +24,7 @@ func main() {
 	searchIndex := repository.NewSearchIndex(typesenseClient)
 
 	worker := searchindexer.NewWorker(searchIndex)
-	server, mux := searchindexer.NewWorkerAndMux(worker)
+	server, mux := searchindexer.NewWorkerAndMux(worker, cfg.RedisAddr)
 
 	go func() {
 		log.Println("Starting Search Indexer worker...")
