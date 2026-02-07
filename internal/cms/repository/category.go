@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"thmanyah.com/content-platform/internal/cms/port"
 	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
@@ -14,20 +13,20 @@ import (
 )
 
 type categoryRepo struct {
-	pool    *pgxpool.Pool
+	db      sqlc.DBTX
 	queries *sqlc.Queries
 }
 
-func NewCategoryRepo(pool *pgxpool.Pool) port.CategoryRepo {
+func NewCategoryRepo(db sqlc.DBTX) port.CategoryRepo {
 	return &categoryRepo{
-		pool:    pool,
-		queries: sqlc.New(pool),
+		db:      db,
+		queries: sqlc.New(db),
 	}
 }
 
 func (r *categoryRepo) WithTx(tx pgx.Tx) port.CategoryRepo {
 	return &categoryRepo{
-		pool:    r.pool,
+		db:      r.db,
 		queries: r.queries.WithTx(tx),
 	}
 }

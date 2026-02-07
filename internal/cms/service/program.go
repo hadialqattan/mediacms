@@ -42,7 +42,7 @@ func (s *Service) UpdateProgramBySlug(ctx context.Context, slug string, params s
 }
 
 func (s *Service) PublishProgram(ctx context.Context, id, userID string) (*domain.Program, error) {
-	tx, err := s.transactionPool.Begin(ctx)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (s *Service) DeleteProgram(ctx context.Context, id, userID string) error {
 		return err
 	}
 
-	tx, err := s.transactionPool.Begin(ctx)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (s *Service) DeleteProgramBySlug(ctx context.Context, slug, userID string) 
 }
 
 func (s *Service) AssignCategories(ctx context.Context, programID string, categoryIDs []string) error {
-	tx, err := s.transactionPool.Begin(ctx)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}

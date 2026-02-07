@@ -8,14 +8,14 @@ import (
 )
 
 type Service struct {
-	programRepo     port.ProgramRepo
-	categoryRepo    port.CategoryRepo
-	sourceRepo      port.SourceRepo
-	outboxRepo      port.OutboxRepo
-	userRepo        port.UserRepo
-	sessionRepo     port.SessionRepo
-	jwtManager      *auth.JWTManager
-	transactionPool *pgxpool.Pool
+	programRepo  port.ProgramRepo
+	categoryRepo port.CategoryRepo
+	sourceRepo   port.SourceRepo
+	outboxRepo   port.OutboxRepo
+	userRepo     port.UserRepo
+	sessionRepo  port.SessionRepo
+	jwtManager   *auth.JWTManager
+	pool         *pgxpool.Pool
 }
 
 func NewService(
@@ -29,13 +29,13 @@ func NewService(
 	pool *pgxpool.Pool,
 ) *Service {
 	return &Service{
-		programRepo:     programRepo,
-		categoryRepo:    categoryRepo,
-		sourceRepo:      sourceRepo,
-		outboxRepo:      outboxRepo,
-		userRepo:        userRepo,
-		sessionRepo:     sessionRepo,
-		jwtManager:      jwtManager,
-		transactionPool: pool,
+		programRepo:  programRepo,
+		categoryRepo: categoryRepo,
+		sourceRepo:   sourceRepo,
+		outboxRepo:   outboxRepo,
+		userRepo:     userRepo,
+		sessionRepo:  sessionRepo,
+		jwtManager:   jwtManager,
+		pool:         pool,
 	}
 }

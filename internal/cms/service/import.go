@@ -12,7 +12,7 @@ import (
 )
 
 func (s *Service) ImportProgram(ctx context.Context, sourceType domain.SourceType, metadata map[string]interface{}) (*domain.Program, error) {
-	tx, err := s.transactionPool.Begin(ctx)
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}

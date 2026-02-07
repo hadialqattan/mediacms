@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"thmanyah.com/content-platform/internal/cms/port"
 	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
@@ -15,20 +14,20 @@ import (
 )
 
 type sourceRepo struct {
-	pool    *pgxpool.Pool
+	db      sqlc.DBTX
 	queries *sqlc.Queries
 }
 
-func NewSourceRepo(pool *pgxpool.Pool) port.SourceRepo {
+func NewSourceRepo(db sqlc.DBTX) port.SourceRepo {
 	return &sourceRepo{
-		pool:    pool,
-		queries: sqlc.New(pool),
+		db:      db,
+		queries: sqlc.New(db),
 	}
 }
 
 func (r *sourceRepo) WithTx(tx pgx.Tx) port.SourceRepo {
 	return &sourceRepo{
-		pool:    r.pool,
+		db:      r.db,
 		queries: r.queries.WithTx(tx),
 	}
 }

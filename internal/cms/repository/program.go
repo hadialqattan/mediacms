@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"thmanyah.com/content-platform/internal/cms/port"
 	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
@@ -14,20 +13,20 @@ import (
 )
 
 type programRepo struct {
-	pool    *pgxpool.Pool
+	db      sqlc.DBTX
 	queries *sqlc.Queries
 }
 
-func NewProgramRepo(pool *pgxpool.Pool) port.ProgramRepo {
+func NewProgramRepo(db sqlc.DBTX) port.ProgramRepo {
 	return &programRepo{
-		pool:    pool,
-		queries: sqlc.New(pool),
+		db:      db,
+		queries: sqlc.New(db),
 	}
 }
 
 func (r *programRepo) WithTx(tx pgx.Tx) port.ProgramRepo {
 	return &programRepo{
-		pool:    r.pool,
+		db:      r.db,
 		queries: r.queries.WithTx(tx),
 	}
 }

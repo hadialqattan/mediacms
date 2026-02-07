@@ -22,11 +22,11 @@ import (
 func main() {
 	cfg := config.Load()
 
-	txPool, err := postgres.NewConnectionPool(context.Background(), cfg.DatabaseURL)
+	pool, err := postgres.NewConnectionPool(context.Background(), cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer txPool.Close()
+	defer pool.Close()
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:            cfg.RedisAddr,
@@ -40,15 +40,15 @@ func main() {
 	}
 	defer redisClient.Close()
 
-	programRepo := repository.NewProgramRepo(txPool)
-	categoryRepo := repository.NewCategoryRepo(txPool)
-	sourceRepo := repository.NewSourceRepo(txPool)
-	outboxRepo := repository.NewOutboxRepo(txPool)
-	userRepo := repository.NewUserRepo(txPool)
+	programRepo := repository.NewProgramRepo(pool)
+	categoryRepo := repository.NewCategoryRepo(pool)
+	sourceRepo := repository.NewSourceRepo(pool)
+	outboxRepo := repository.NewOutboxRepo(pool)
+	userRepo := repository.NewUserRepo(pool)
 	sessionRepo := repository.NewSessionRepo(redisClient, cfg.JWT)
 	jwtManager := auth.NewJWTManager(cfg.JWT)
 
-	svc := service.NewService(programRepo, categoryRepo, sourceRepo, outboxRepo, userRepo, sessionRepo, jwtManager, txPool)
+	svc := service.NewService(programRepo, categoryRepo, sourceRepo, outboxRepo, userRepo, sessionRepo, jwtManager, pool)
 
 	r := router.NewRouter(svc, cfg.JWT)
 
