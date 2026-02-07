@@ -81,7 +81,7 @@ func NewWorkerAndMux(worker *Worker) (*asynq.Server, *asynq.ServeMux) {
 				"low":      1,
 			},
 			ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
-				log.Printf("Task %s failed: %v", task.Type, err)
+				log.Printf("Task %s failed: %v", task.Type(), err)
 			}),
 		},
 	)
