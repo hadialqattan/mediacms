@@ -10,9 +10,13 @@ tasks:
       - go build -o bin/outbox-relay ./cmd/outbox-relay
       - go build -o bin/search-indexer ./cmd/search-indexer
 
-  test:
+  test:unit:
     cmds:
-      - go test -v ./tests/integration/...
+      - go test ./... -v -short
+
+  test:integration:
+    cmds:
+      - go test ./... -v -tags=integration -parallel=1
 
   # Database commands.
   sqlc:
