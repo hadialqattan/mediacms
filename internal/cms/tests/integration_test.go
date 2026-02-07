@@ -52,7 +52,7 @@ func setupTestSuite(t *testing.T) *testSuite {
 		return nil
 	}
 
-	cleanupTestData(ctx, t, pool)
+	cleanupTestData(ctx, pool)
 	redisClient.FlushDB(ctx)
 
 	programRepo := repository.NewProgramRepo(pool)
@@ -79,7 +79,7 @@ func setupTestSuite(t *testing.T) *testSuite {
 		sourceRepo:  sourceRepo,
 		testRouter:  testRouter,
 		cleanupFunc: func() {
-			cleanupTestData(ctx, t, pool)
+			cleanupTestData(ctx, pool)
 			redisClient.FlushDB(ctx)
 			pool.Close()
 			redisClient.Close()
@@ -150,7 +150,7 @@ func createTestProgram(t *testing.T, testRouter http.Handler, accessToken, slug 
 	return program
 }
 
-func cleanupTestData(ctx context.Context, t *testing.T, pool *pgxpool.Pool) {
+func cleanupTestData(ctx context.Context, pool *pgxpool.Pool) {
 	// TODO: Use testing containers and remove this function.
 	pool.Exec(ctx, "DELETE FROM outbox_events")
 	pool.Exec(ctx, "DELETE FROM categorized_as")
