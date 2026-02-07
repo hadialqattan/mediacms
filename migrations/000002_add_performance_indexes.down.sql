@@ -1,0 +1,3 @@
+DROP INDEX idx_programs_deleted_at_created_at;
+
+DROP INDEX idx_outbox_events_enqueued_created_at;
