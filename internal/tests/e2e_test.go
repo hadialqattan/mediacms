@@ -68,7 +68,10 @@ func TestFullCMSToDiscoveryFlow(t *testing.T) {
 	searchAndVerifyProgram(t, suite.discoveryRouter, programID)
 
 	t.Log("Cleaning up test data...")
+	_, _ = suite.typesenseClient.Collection("programs").Document(programID).Delete(ctx)
+
 	suite.pool.Exec(ctx, "DELETE FROM outbox_events WHERE program_id = $1", programID)
+	suite.pool.Exec(ctx, "DELETE FROM categorized_as WHERE program_id = $1", programID)
 	suite.pool.Exec(ctx, "DELETE FROM programs WHERE id = $1", programID)
 	suite.pool.Exec(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -102,8 +105,6 @@ func setupE2ETest(t *testing.T) *e2eTestSuite {
 	pool.Exec(ctx, "DELETE FROM users WHERE email LIKE 'e2e-test%@example.com'")
 	redisClient.FlushAll(ctx)
 
-	_, _ = typesenseClient.Collection("programs").Delete(ctx)
-
 	schema := &api.CollectionSchema{
 		Name: "programs",
 		Fields: []api.Field{
@@ -118,12 +119,7 @@ func setupE2ETest(t *testing.T) *e2eTestSuite {
 			{Name: "published_at", Type: "int64"},
 		},
 	}
-
-	collection, err := typesenseClient.Collections().Create(ctx, schema)
-	if err != nil {
-		t.Fatalf("Failed to create TypeSense collection: %v", err)
-	}
-	t.Logf("Created TypeSense collection: %v", collection.Name)
+	_, _ = typesenseClient.Collections().Create(ctx, schema)
 
 	programRepo := cmsrepo.NewProgramRepo(pool)
 	categoryRepo := cmsrepo.NewCategoryRepo(pool)
@@ -164,7 +160,6 @@ func setupE2ETest(t *testing.T) *e2eTestSuite {
 	t.Cleanup(func() {
 		pool.Close()
 		redisClient.Close()
-		_, _ = typesenseClient.Collection("programs").Delete(ctx)
 	})
 
 	return suite

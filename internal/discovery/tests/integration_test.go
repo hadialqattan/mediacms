@@ -52,22 +52,15 @@ func TestDiscoveryEndpoints(t *testing.T) {
 		},
 	}
 
-	collection, err := client.Collections().Create(ctx, schema)
-	if err != nil {
-		t.Fatalf("Failed to create collection: %v", err)
-	}
-	t.Logf("Created collection: %v", collection.Name)
-
-	t.Cleanup(func() {
-		_, _ = client.Collection("programs").Delete(ctx)
-	})
+	_, _ = client.Collections().Create(ctx, schema)
 
 	searchIndex := repository.NewSearchIndex(client)
 	discoveryService := discovery.NewService(searchIndex)
 	testRouter := router.NewRouter(discoveryService)
 
+	testProgramID := "test-id-123"
 	testProgram := domain.Program{
-		ID:          "test-id-123",
+		ID:          testProgramID,
 		Slug:        "test-podcast-discovery",
 		Title:       "Test Discovery Podcast",
 		Description: "A test podcast for discovery",
@@ -83,6 +76,10 @@ func TestDiscoveryEndpoints(t *testing.T) {
 	if err := searchIndex.UpsertProgram(ctx, testProgram); err != nil {
 		t.Fatalf("Failed to index test program: %v", err)
 	}
+
+	t.Cleanup(func() {
+		_, _ = client.Collection("programs").Document(testProgramID).Delete(ctx)
+	})
 
 	t.Run("Search programs", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/v1/programs/search?q=podcast", nil)

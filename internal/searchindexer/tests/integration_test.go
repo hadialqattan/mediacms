@@ -56,11 +56,7 @@ func setupTestSuite(t *testing.T) *testSuite {
 		},
 	}
 
-	_, err := typesenseClient.Collections().Create(ctx, schema)
-	if err != nil {
-		redisClient.Close()
-		t.Fatalf("Failed to create TypeSense collection: %v", err)
-	}
+	_, _ = typesenseClient.Collections().Create(ctx, schema)
 
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: "localhost:6379"})
 
@@ -71,7 +67,6 @@ func setupTestSuite(t *testing.T) *testSuite {
 		typesenseClient: typesenseClient,
 		asynqClient:     asynqClient,
 		cleanupFunc: func() {
-			typesenseClient.Collection("programs").Delete(ctx)
 			redisClient.Close()
 		},
 	}
@@ -120,6 +115,10 @@ func TestUpsertPublishedProgram(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, program.ID, doc["id"])
 	assert.Equal(t, program.Title, doc["title"])
+
+	t.Cleanup(func() {
+		_, _ = suite.typesenseClient.Collection("programs").Document(program.ID).Delete(context.Background())
+	})
 }
 
 func TestDeleteProgramFromIndex(t *testing.T) {
