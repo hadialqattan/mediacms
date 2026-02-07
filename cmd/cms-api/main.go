@@ -50,6 +50,10 @@ func main() {
 
 	svc := service.NewService(programRepo, categoryRepo, sourceRepo, outboxRepo, userRepo, sessionRepo, jwtManager, pool)
 
+	if err := svc.SeedDefaultAdmin(context.Background(), cfg.DefaultAdmin.Email, cfg.DefaultAdmin.Password); err != nil {
+		log.Fatalf("Failed to seed default admin: %v", err)
+	}
+
 	r := router.NewRouter(svc, cfg.JWT)
 
 	server := &http.Server{

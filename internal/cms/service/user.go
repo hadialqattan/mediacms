@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/hadialqattan/mediacms/internal/cms/repository/sqlc"
 	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
@@ -102,4 +104,27 @@ func (s *Service) RefreshAccessToken(ctx context.Context, sessionID, userID stri
 
 func (s *Service) Logout(ctx context.Context, sessionID string) error {
 	return s.sessionRepo.DeleteSession(ctx, sessionID)
+}
+
+func (s *Service) SeedDefaultAdmin(ctx context.Context, email, password string) error {
+	count, err := s.userRepo.Count(ctx)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return nil
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.userRepo.Create(ctx, sqlc.CreateUserParams{
+		Email:        email,
+		PasswordHash: string(hash),
+		Role:         string(domain.UserRoleAdmin),
+	})
+	return err
 }

@@ -28,17 +28,24 @@ func NewRouter(svc *service.Service, jwtCfg config.JWTConfig) *chi.Mux {
 	programHandler := handler.NewProgramHandler(svc)
 	categoryHandler := handler.NewCategoryHandler(svc)
 	importHandler := handler.NewImportHandler(svc)
+	userHandler := handler.NewUserHandler(svc)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
 			r.Post("/login", authHandler.Login)
-			r.Post("/register", authHandler.CreateUser)
 			r.Post("/refresh", authHandler.Refresh)
 			r.Post("/logout", authHandler.Logout)
 		})
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.JWTAuth(jwtManager))
+			r.Use(middleware.RequireAdmin(jwtManager))
+			r.Post("/users", userHandler.CreateUser)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtManager))
+			r.Use(middleware.RequireAdminOrEditor(jwtManager))
 
 			r.Get("/programs", programHandler.List)
 			r.Post("/programs", programHandler.Create)

@@ -58,6 +58,10 @@ func (r *userRepo) GetByEmail(ctx context.Context, email string) (*domain.User, 
 	return r.domainUser(user), nil
 }
 
+func (r *userRepo) Count(ctx context.Context) (int64, error) {
+	return r.queries.CountUsers(ctx)
+}
+
 func (r *userRepo) domainUser(u sqlc.User) *domain.User {
 	return &domain.User{
 		ID:           uuid.UUID(u.ID.Bytes).String(),

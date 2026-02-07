@@ -13,12 +13,18 @@ type Config struct {
 	TypesenseAddress string
 	TypesenseAPIKey  string
 	JWT              JWTConfig
+	DefaultAdmin     DefaultAdminConfig
 }
 
 type JWTConfig struct {
 	Secret          string
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
+}
+
+type DefaultAdminConfig struct {
+	Email    string
+	Password string
 }
 
 func Load() *Config {
@@ -33,6 +39,10 @@ func Load() *Config {
 			Secret:          getEnv("JWT_SECRET", "secret-key-change-in-production"),
 			AccessTokenTTL:  getDurationEnv("JWT_ACCESS_TOKEN_TTL", 15*time.Minute),
 			RefreshTokenTTL: getDurationEnv("JWT_REFRESH_TOKEN_TTL", 720*time.Hour),
+		},
+		DefaultAdmin: DefaultAdminConfig{
+			Email:    getEnv("DEFAULT_ADMIN_EMAIL", "admin@mediacms.local"),
+			Password: getEnv("DEFAULT_ADMIN_PASSWORD", "changeme"),
 		},
 	}
 }

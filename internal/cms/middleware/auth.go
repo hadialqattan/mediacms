@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/hadialqattan/mediacms/internal/cms/auth"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 type contextKey string
@@ -59,4 +60,44 @@ func GetUserRole(r *http.Request) string {
 		return v
 	}
 	return ""
+}
+
+func RequireRole(allowedRoles ...domain.UserRole) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userRoleStr := GetUserRole(r)
+			if !domain.IsValidUserRole(userRoleStr) {
+				http.Error(w, "User role should be 'admin' or 'editor'", http.StatusUnauthorized)
+				return
+			}
+
+			userRole := domain.UserRole(userRoleStr)
+			allowed := false
+			for _, role := range allowedRoles {
+				if userRole == role {
+					allowed = true
+					break
+				}
+			}
+
+			if !allowed {
+				http.Error(w, "Insufficient permissions", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func RequireAdmin(jwtManager *auth.JWTManager) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return JWTAuth(jwtManager)(RequireRole(domain.UserRoleAdmin)(next))
+	}
+}
+
+func RequireAdminOrEditor(jwtManager *auth.JWTManager) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return JWTAuth(jwtManager)(RequireRole(domain.UserRoleAdmin, domain.UserRoleEditor)(next))
+	}
 }
