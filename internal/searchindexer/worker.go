@@ -12,82 +12,56 @@ import (
 )
 
 type Worker struct {
-	programReader port.ProgramReader
-	searchIndex   port.SearchIndex
+	searchIndex port.SearchIndex
 }
 
 func NewWorker(
-	programReader port.ProgramReader,
 	searchIndex port.SearchIndex,
 ) *Worker {
 	return &Worker{
-		programReader: programReader,
-		searchIndex:   searchIndex,
+		searchIndex: searchIndex,
 	}
 }
 
 func (w *Worker) HandleProgramUpsert(ctx context.Context, t *asynq.Task) error {
-	var payload map[string]interface{}
-	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
-		return err
-	}
-
-	programID, ok := payload["program_id"].(string)
-	if !ok {
-		log.Printf("Invalid payload for program.upsert: missing program_id")
-		return nil
-	}
-
-	program, err := w.programReader.GetByID(ctx, programID)
-	if err != nil {
-		log.Printf("Failed to get program %s: %v", programID, err)
+	var program domain.Program
+	if err := json.Unmarshal(t.Payload(), &program); err != nil {
+		log.Printf("Failed to unmarshal program payload: %v", err)
 		return err
 	}
 
 	if !program.IsPublished() {
-		log.Printf("Program %s is not published, skipping indexing", programID)
+		log.Printf("Program %s is not published, skipping indexing", program.ID)
 		return nil
 	}
 
 	if program.IsDeleted() {
-		log.Printf("Program %s is deleted, skipping indexing", programID)
+		log.Printf("Program %s is deleted, skipping indexing", program.ID)
 		return nil
 	}
 
-	categories, err := w.programReader.GetCategories(ctx, programID)
-	if err != nil {
-		log.Printf("Failed to get categories for program %s: %v", programID, err)
-	} else {
-		program.Categories = categories
-	}
-
-	if err := w.searchIndex.UpsertProgram(ctx, *program); err != nil {
-		log.Printf("Failed to upsert program %s to search index: %v", programID, err)
+	if err := w.searchIndex.UpsertProgram(ctx, program); err != nil {
+		log.Printf("Failed to upsert program %s to search index: %v", program.ID, err)
 		return err
 	}
 
-	log.Printf("Successfully indexed program %s", programID)
+	log.Printf("Successfully indexed program %s", program.ID)
 	return nil
 }
 
 func (w *Worker) HandleProgramDelete(ctx context.Context, t *asynq.Task) error {
-	var payload map[string]interface{}
-	if err := json.Unmarshal(t.Payload(), &payload); err != nil {
+	var program domain.Program
+	if err := json.Unmarshal(t.Payload(), &program); err != nil {
+		log.Printf("Failed to unmarshal program payload: %v", err)
 		return err
 	}
 
-	programID, ok := payload["program_id"].(string)
-	if !ok {
-		log.Printf("Invalid payload for program.delete: missing program_id")
-		return nil
-	}
-
-	if err := w.searchIndex.DeleteProgram(ctx, programID); err != nil {
-		log.Printf("Failed to delete program %s from search index: %v", programID, err)
+	if err := w.searchIndex.DeleteProgram(ctx, program.ID); err != nil {
+		log.Printf("Failed to delete program %s from search index: %v", program.ID, err)
 		return err
 	}
 
-	log.Printf("Successfully deleted program %s from search index", programID)
+	log.Printf("Successfully deleted program %s from search index", program.ID)
 	return nil
 }
 

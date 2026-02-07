@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/hibiken/asynq"
+	"thmanyah.com/content-platform/internal/shared/domain"
 )
 
 type Indexer struct {
@@ -14,11 +15,11 @@ func NewIndexer(worker *Worker) *Indexer {
 	return &Indexer{worker: worker}
 }
 
-func (i *Indexer) ProcessTask(ctx context.Context, eventType string, task *asynq.Task) error {
+func (i *Indexer) ProcessTask(ctx context.Context, eventType domain.OutboxEventType, task *asynq.Task) error {
 	switch eventType {
-	case "program.upsert":
+	case domain.OutboxEventTypeProgramUpsert:
 		return i.worker.HandleProgramUpsert(ctx, task)
-	case "program.delete":
+	case domain.OutboxEventTypeProgramDelete:
 		return i.worker.HandleProgramDelete(ctx, task)
 	default:
 		return nil

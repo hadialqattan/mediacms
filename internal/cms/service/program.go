@@ -53,7 +53,7 @@ func (s *Service) PublishProgram(ctx context.Context, id, userID string) (*domai
 		return nil, err
 	}
 
-	if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramUpsert, &program.ID); err != nil {
+	if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramUpsert, program); err != nil {
 		return nil, err
 	}
 
@@ -89,7 +89,7 @@ func (s *Service) DeleteProgram(ctx context.Context, id, userID string) error {
 		return err
 	}
 	if program.IsPublished() {
-		if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramDelete, &program.ID); err != nil {
+		if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramDelete, program); err != nil {
 			return err
 		}
 	}
@@ -125,7 +125,7 @@ func (s *Service) AssignCategories(ctx context.Context, programID string, catego
 		return err
 	}
 	if program.IsPublished() {
-		if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramUpsert, &programID); err != nil {
+		if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramUpsert, program); err != nil {
 			return err
 		}
 	}
@@ -159,8 +159,14 @@ func (s *Service) GetProgramCategoriesBySlug(ctx context.Context, slug string) (
 	return s.programRepo.GetCategories(ctx, program.ID)
 }
 
-func (s *Service) emitOutboxEvent(ctx context.Context, tx pgx.Tx, eventType domain.OutboxEventType, programID *string) error {
-	payload, err := json.Marshal(map[string]interface{}{"program_id": *programID})
+func (s *Service) emitOutboxEvent(ctx context.Context, tx pgx.Tx, eventType domain.OutboxEventType, program *domain.Program) error {
+	categories, err := s.programRepo.WithTx(tx).GetCategories(ctx, program.ID)
+	if err != nil {
+		return err
+	}
+	program.Categories = categories
+
+	payload, err := json.Marshal(program)
 	if err != nil {
 		return err
 	}
@@ -168,7 +174,7 @@ func (s *Service) emitOutboxEvent(ctx context.Context, tx pgx.Tx, eventType doma
 	_, err = s.outboxRepo.WithTx(tx).Create(ctx, sqlc.CreateOutboxEventParams{
 		Type:      string(eventType),
 		Payload:   payload,
-		ProgramID: pgtype.UUID{Bytes: uuid.MustParse(*programID), Valid: true},
+		ProgramID: pgtype.UUID{Bytes: uuid.MustParse(program.ID), Valid: true},
 	})
 	return err
 }

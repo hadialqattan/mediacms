@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -12,28 +11,19 @@ import (
 	"thmanyah.com/content-platform/config"
 	"thmanyah.com/content-platform/internal/discovery/repository"
 	"thmanyah.com/content-platform/internal/searchindexer"
-	searchindexerrepo "thmanyah.com/content-platform/internal/searchindexer/repository"
-	"thmanyah.com/content-platform/internal/shared/postgres"
 )
 
 func main() {
 	cfg := config.Load()
-
-	pool, err := postgres.NewConnectionPool(context.Background(), cfg.DatabaseURL)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer pool.Close()
 
 	typesenseClient := typesense.NewClient(
 		typesense.WithServer(cfg.TypesenseAddress),
 		typesense.WithAPIKey(cfg.TypesenseAPIKey),
 	)
 
-	programReader := searchindexerrepo.NewProgramReader(pool)
 	searchIndex := repository.NewSearchIndex(typesenseClient)
-	
-	worker := searchindexer.NewWorker(programReader, searchIndex)
+
+	worker := searchindexer.NewWorker(searchIndex)
 	server, mux := searchindexer.NewWorkerAndMux(worker)
 
 	go func() {
