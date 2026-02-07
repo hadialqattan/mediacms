@@ -11,11 +11,11 @@ import (
 
 type Relay struct {
 	outboxRepo port.OutboxRepo
-	queue      port.MessageQueue
+	queue      port.Queue
 	interval   time.Duration
 }
 
-func NewRelay(outboxRepo port.OutboxRepo, queue port.MessageQueue, interval time.Duration) *Relay {
+func NewRelay(outboxRepo port.OutboxRepo, queue port.Queue, interval time.Duration) *Relay {
 	return &Relay{
 		outboxRepo: outboxRepo,
 		queue:      queue,
@@ -52,7 +52,7 @@ func (r *Relay) poll(ctx context.Context) error {
 			continue
 		}
 
-		if err := r.queue.Enqueue(ctx, string(event.Type), payload); err != nil {
+		if err := r.queue.Enqueue(ctx, event.Type, payload); err != nil {
 			log.Printf("Failed to enqueue task: %v", err)
 			continue
 		}

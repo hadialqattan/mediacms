@@ -24,7 +24,7 @@ func main() {
 	defer pool.Close()
 
 	outboxRepo := repository.NewOutboxRepo(pool)
-	queue := repository.NewAsynqClient(cfg.RedisAddr)
+	queue := repository.NewQueue(cfg.RedisAddr)
 
 	relay := outboxrelay.NewRelay(outboxRepo, queue, 5*time.Second)
 

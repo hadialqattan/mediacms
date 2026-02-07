@@ -8,11 +8,7 @@ import (
 	"github.com/hibiken/asynq"
 
 	"thmanyah.com/content-platform/internal/searchindexer/port"
-)
-
-const (
-	TypeProgramUpsert  = "program.upsert"
-	TypeProgramDelete = "program.delete"
+	"thmanyah.com/content-platform/internal/shared/domain"
 )
 
 type Worker struct {
@@ -98,8 +94,8 @@ func (w *Worker) HandleProgramDelete(ctx context.Context, t *asynq.Task) error {
 func NewWorkerAndMux(worker *Worker) (*asynq.Server, *asynq.ServeMux) {
 	mux := asynq.NewServeMux()
 
-	mux.HandleFunc(TypeProgramUpsert, worker.HandleProgramUpsert)
-	mux.HandleFunc(TypeProgramDelete, worker.HandleProgramDelete)
+	mux.HandleFunc(string(domain.OutboxEventTypeProgramUpsert), worker.HandleProgramUpsert)
+	mux.HandleFunc(string(domain.OutboxEventTypeProgramDelete), worker.HandleProgramDelete)
 
 	server := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: "localhost:6379"},
