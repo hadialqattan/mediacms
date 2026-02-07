@@ -12,12 +12,18 @@ import (
 )
 
 func (s *Service) ImportProgram(ctx context.Context, sourceType domain.SourceType, metadata map[string]interface{}) (*domain.Program, error) {
+	tx, err := s.transactionPool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
 	metadataBytes, err := json.Marshal(metadata)
 	if err != nil {
 		return nil, err
 	}
 
-	source, err := s.sourceRepo.Create(ctx, sqlc.CreateSourceParams{
+	source, err := s.sourceRepo.WithTx(tx).Create(ctx, sqlc.CreateSourceParams{
 		Type:     string(sourceType),
 		Metadata: metadataBytes,
 	})
@@ -37,5 +43,14 @@ func (s *Service) ImportProgram(ctx context.Context, sourceType domain.SourceTyp
 		CreatedBy:   pgtype.UUID{Bytes: createdByID, Valid: true},
 	}
 
-	return s.programRepo.Create(ctx, params)
+	program, err := s.programRepo.WithTx(tx).Create(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return program, nil
 }

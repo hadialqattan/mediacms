@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"thmanyah.com/content-platform/internal/cms/port"
@@ -12,12 +13,21 @@ import (
 )
 
 type outboxRepo struct {
+	pool    *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
 func NewOutboxRepo(pool *pgxpool.Pool) port.OutboxRepo {
 	return &outboxRepo{
+		pool:    pool,
 		queries: sqlc.New(pool),
+	}
+}
+
+func (r *outboxRepo) WithTx(tx pgx.Tx) port.OutboxRepo {
+	return &outboxRepo{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
 	}
 }
 

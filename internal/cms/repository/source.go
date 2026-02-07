@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -14,12 +15,21 @@ import (
 )
 
 type sourceRepo struct {
+	pool    *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
 func NewSourceRepo(pool *pgxpool.Pool) port.SourceRepo {
 	return &sourceRepo{
+		pool:    pool,
 		queries: sqlc.New(pool),
+	}
+}
+
+func (r *sourceRepo) WithTx(tx pgx.Tx) port.SourceRepo {
+	return &sourceRepo{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
 	}
 }
 

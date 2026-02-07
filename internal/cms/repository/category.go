@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -13,12 +14,21 @@ import (
 )
 
 type categoryRepo struct {
+	pool    *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
 func NewCategoryRepo(pool *pgxpool.Pool) port.CategoryRepo {
 	return &categoryRepo{
+		pool:    pool,
 		queries: sqlc.New(pool),
+	}
+}
+
+func (r *categoryRepo) WithTx(tx pgx.Tx) port.CategoryRepo {
+	return &categoryRepo{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
 	}
 }
 

@@ -3,10 +3,13 @@ package port
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
+
 	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
 	"thmanyah.com/content-platform/internal/shared/domain"
 )
 
 type OutboxRepo interface {
 	Create(ctx context.Context, params sqlc.CreateOutboxEventParams) (*domain.OutboxEvent, error)
+	WithTx(tx pgx.Tx) OutboxRepo
 }

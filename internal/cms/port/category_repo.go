@@ -3,6 +3,8 @@ package port
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
+
 	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
 	"thmanyah.com/content-platform/internal/shared/domain"
 )
@@ -12,4 +14,5 @@ type CategoryRepo interface {
 	GetByID(ctx context.Context, id string) (*domain.Category, error)
 	GetByName(ctx context.Context, name string) (*domain.Category, error)
 	List(ctx context.Context) ([]*domain.Category, error)
+	WithTx(tx pgx.Tx) CategoryRepo
 }

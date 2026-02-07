@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -13,12 +14,21 @@ import (
 )
 
 type userRepo struct {
+	pool    *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
 func NewUserRepo(pool *pgxpool.Pool) port.UserRepo {
 	return &userRepo{
+		pool:    pool,
 		queries: sqlc.New(pool),
+	}
+}
+
+func (r *userRepo) WithTx(tx pgx.Tx) port.UserRepo {
+	return &userRepo{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
 	}
 }
 

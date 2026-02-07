@@ -3,6 +3,8 @@ package port
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
+
 	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
 	"thmanyah.com/content-platform/internal/shared/domain"
 )
@@ -17,4 +19,5 @@ type ProgramRepo interface {
 	Delete(ctx context.Context, id, deletedBy string) error
 	AssignCategories(ctx context.Context, programID string, categoryIDs []string) error
 	GetCategories(ctx context.Context, programID string) ([]domain.Category, error)
+	WithTx(tx pgx.Tx) ProgramRepo
 }

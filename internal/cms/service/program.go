@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
@@ -41,12 +42,22 @@ func (s *Service) UpdateProgramBySlug(ctx context.Context, slug string, params s
 }
 
 func (s *Service) PublishProgram(ctx context.Context, id, userID string) (*domain.Program, error) {
-	program, err := s.programRepo.Publish(ctx, id, userID)
+	tx, err := s.transactionPool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	program, err := s.programRepo.WithTx(tx).Publish(ctx, id, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.emitOutboxEvent(ctx, domain.OutboxEventTypeProgramUpsert, &program.ID); err != nil {
+	if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramUpsert, &program.ID); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -68,14 +79,23 @@ func (s *Service) DeleteProgram(ctx context.Context, id, userID string) error {
 		return err
 	}
 
-	if err := s.programRepo.Delete(ctx, id, userID); err != nil {
+	tx, err := s.transactionPool.Begin(ctx)
+	if err != nil {
 		return err
 	}
+	defer tx.Rollback(ctx)
 
+	if err := s.programRepo.WithTx(tx).Delete(ctx, id, userID); err != nil {
+		return err
+	}
 	if program.IsPublished() {
-		if err := s.emitOutboxEvent(ctx, domain.OutboxEventTypeProgramDelete, &program.ID); err != nil {
+		if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramDelete, &program.ID); err != nil {
 			return err
 		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
 	}
 
 	return nil
@@ -91,19 +111,27 @@ func (s *Service) DeleteProgramBySlug(ctx context.Context, slug, userID string) 
 }
 
 func (s *Service) AssignCategories(ctx context.Context, programID string, categoryIDs []string) error {
-	if err := s.programRepo.AssignCategories(ctx, programID, categoryIDs); err != nil {
-		return err
-	}
-
-	program, err := s.programRepo.GetByID(ctx, programID)
+	tx, err := s.transactionPool.Begin(ctx)
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback(ctx)
 
+	if err := s.programRepo.WithTx(tx).AssignCategories(ctx, programID, categoryIDs); err != nil {
+		return err
+	}
+	program, err := s.programRepo.WithTx(tx).GetByID(ctx, programID)
+	if err != nil {
+		return err
+	}
 	if program.IsPublished() {
-		if err := s.emitOutboxEvent(ctx, domain.OutboxEventTypeProgramUpsert, &programID); err != nil {
+		if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramUpsert, &programID); err != nil {
 			return err
 		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
 	}
 
 	return nil
@@ -131,13 +159,13 @@ func (s *Service) GetProgramCategoriesBySlug(ctx context.Context, slug string) (
 	return s.programRepo.GetCategories(ctx, program.ID)
 }
 
-func (s *Service) emitOutboxEvent(ctx context.Context, eventType domain.OutboxEventType, programID *string) error {
+func (s *Service) emitOutboxEvent(ctx context.Context, tx pgx.Tx, eventType domain.OutboxEventType, programID *string) error {
 	payload, err := json.Marshal(map[string]interface{}{"program_id": *programID})
 	if err != nil {
 		return err
 	}
 
-	_, err = s.outboxRepo.Create(ctx, sqlc.CreateOutboxEventParams{
+	_, err = s.outboxRepo.WithTx(tx).Create(ctx, sqlc.CreateOutboxEventParams{
 		Type:      string(eventType),
 		Payload:   payload,
 		ProgramID: pgtype.UUID{Bytes: uuid.MustParse(*programID), Valid: true},
