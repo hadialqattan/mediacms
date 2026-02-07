@@ -4,11 +4,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 
-	"thmanyah.com/content-platform/config"
-	"thmanyah.com/content-platform/internal/cms/auth"
-	"thmanyah.com/content-platform/internal/cms/handler"
-	"thmanyah.com/content-platform/internal/cms/middleware"
-	"thmanyah.com/content-platform/internal/cms/service"
+	"github.com/hadialqattan/mediacms/config"
+	"github.com/hadialqattan/mediacms/internal/cms/auth"
+	"github.com/hadialqattan/mediacms/internal/cms/handler"
+	"github.com/hadialqattan/mediacms/internal/cms/middleware"
+	"github.com/hadialqattan/mediacms/internal/cms/service"
 )
 
 func NewRouter(svc *service.Service, jwtCfg config.JWTConfig) *chi.Mux {

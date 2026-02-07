@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"thmanyah.com/content-platform/internal/cms/middleware"
-	"thmanyah.com/content-platform/internal/cms/service"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/cms/middleware"
+	"github.com/hadialqattan/mediacms/internal/cms/service"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 type ImportHandler struct {

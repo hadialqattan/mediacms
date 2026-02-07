@@ -16,7 +16,7 @@ import (
 	"github.com/typesense/typesense-go/typesense"
 	"github.com/typesense/typesense-go/typesense/api"
 
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 type testSuite struct {

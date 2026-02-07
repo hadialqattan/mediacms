@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/cms/repository/sqlc"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 func (s *Service) ImportProgram(ctx context.Context, sourceType domain.SourceType, metadata map[string]interface{}) (*domain.Program, error) {

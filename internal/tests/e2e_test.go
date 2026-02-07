@@ -19,19 +19,19 @@ import (
 	"github.com/typesense/typesense-go/typesense/api"
 	"golang.org/x/crypto/bcrypt"
 
-	"thmanyah.com/content-platform/config"
-	"thmanyah.com/content-platform/internal/cms/auth"
-	"thmanyah.com/content-platform/internal/cms/handler"
-	cmsrepo "thmanyah.com/content-platform/internal/cms/repository"
-	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
-	cmsrouter "thmanyah.com/content-platform/internal/cms/router"
-	cmsservice "thmanyah.com/content-platform/internal/cms/service"
-	cmsdiscovery "thmanyah.com/content-platform/internal/discovery"
-	discoveryrepo "thmanyah.com/content-platform/internal/discovery/repository"
-	discoveryrouter "thmanyah.com/content-platform/internal/discovery/router"
-	"thmanyah.com/content-platform/internal/outboxrelay"
-	outboxrepo "thmanyah.com/content-platform/internal/outboxrelay/repository"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/config"
+	"github.com/hadialqattan/mediacms/internal/cms/auth"
+	"github.com/hadialqattan/mediacms/internal/cms/handler"
+	cmsrepo "github.com/hadialqattan/mediacms/internal/cms/repository"
+	"github.com/hadialqattan/mediacms/internal/cms/repository/sqlc"
+	cmsrouter "github.com/hadialqattan/mediacms/internal/cms/router"
+	cmsservice "github.com/hadialqattan/mediacms/internal/cms/service"
+	cmsdiscovery "github.com/hadialqattan/mediacms/internal/discovery"
+	discoveryrepo "github.com/hadialqattan/mediacms/internal/discovery/repository"
+	discoveryrouter "github.com/hadialqattan/mediacms/internal/discovery/router"
+	"github.com/hadialqattan/mediacms/internal/outboxrelay"
+	outboxrepo "github.com/hadialqattan/mediacms/internal/outboxrelay/repository"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 type e2eTestSuite struct {
@@ -78,7 +78,7 @@ func TestFullCMSToDiscoveryFlow(t *testing.T) {
 func setupE2ETest(t *testing.T) *e2eTestSuite {
 	ctx := context.Background()
 
-	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/thmanyah?sslmode=disable")
+	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/mediacms?sslmode=disable")
 	if err != nil {
 		t.Skipf("Database not available, skipping integration test: %v", err)
 		return nil

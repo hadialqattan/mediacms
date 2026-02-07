@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 type SearchIndex interface {

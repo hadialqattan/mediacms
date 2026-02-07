@@ -27,7 +27,7 @@ tasks:
 
   migrate:
     cmds:
-      - migrate -path migrations -database "postgres://postgres:postgres@localhost:5432/thmanyah?sslmode=disable" up
+      - migrate -path migrations -database "postgres://postgres:postgres@localhost:5432/mediacms?sslmode=disable" up
 
   # Docker commands.
   up:
@@ -45,5 +45,5 @@ tasks:
   purge:
     cmds:
       - docker compose down -v
-      - docker container ls -aq -f label=com.thmanyah.project=content-platform | xargs -r docker container rm -f
-      - docker volume ls -q -f label=com.thmanyah.project=content-platform | xargs -r docker volume rm -f
+      - docker container ls -aq -f label=com.mediacms.project=content-platform | xargs -r docker container rm -f
+      - docker volume ls -q -f label=com.mediacms.project=content-platform | xargs -r docker volume rm -f

@@ -3,8 +3,8 @@ package searchindexer
 import (
 	"context"
 
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 	"github.com/hibiken/asynq"
-	"thmanyah.com/content-platform/internal/shared/domain"
 )
 
 type Indexer struct {

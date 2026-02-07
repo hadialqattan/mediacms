@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/cms/repository/sqlc"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 func (s *Service) CreateUser(ctx context.Context, params sqlc.CreateUserParams) (*domain.User, error) {

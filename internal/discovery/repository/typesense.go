@@ -7,8 +7,8 @@ import (
 	"github.com/typesense/typesense-go/typesense"
 	"github.com/typesense/typesense-go/typesense/api"
 
-	"thmanyah.com/content-platform/internal/discovery/port"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/discovery/port"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 const collectionName = "programs"

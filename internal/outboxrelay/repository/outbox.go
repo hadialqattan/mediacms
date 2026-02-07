@@ -9,9 +9,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"thmanyah.com/content-platform/internal/outboxrelay/port"
-	"thmanyah.com/content-platform/internal/outboxrelay/repository/sqlc"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/outboxrelay/port"
+	"github.com/hadialqattan/mediacms/internal/outboxrelay/repository/sqlc"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 type outboxRepo struct {

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"thmanyah.com/content-platform/internal/cms/auth"
+	"github.com/hadialqattan/mediacms/internal/cms/auth"
 )
 
 type contextKey string

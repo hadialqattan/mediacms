@@ -3,8 +3,8 @@ package discovery
 import (
 	"context"
 
-	"thmanyah.com/content-platform/internal/discovery/port"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/discovery/port"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 type Service struct {

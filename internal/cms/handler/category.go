@@ -6,8 +6,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
-	"thmanyah.com/content-platform/internal/cms/service"
+	"github.com/hadialqattan/mediacms/internal/cms/repository/sqlc"
+	"github.com/hadialqattan/mediacms/internal/cms/service"
 )
 
 type CategoryHandler struct {

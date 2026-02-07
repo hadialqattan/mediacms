@@ -3,8 +3,8 @@ package service
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"thmanyah.com/content-platform/internal/cms/auth"
-	"thmanyah.com/content-platform/internal/cms/port"
+	"github.com/hadialqattan/mediacms/internal/cms/auth"
+	"github.com/hadialqattan/mediacms/internal/cms/port"
 )
 
 type Service struct {

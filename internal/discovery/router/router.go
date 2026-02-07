@@ -4,8 +4,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 
-	"thmanyah.com/content-platform/internal/discovery"
-	"thmanyah.com/content-platform/internal/discovery/handler"
+	"github.com/hadialqattan/mediacms/internal/discovery"
+	"github.com/hadialqattan/mediacms/internal/discovery/handler"
 )
 
 func NewRouter(service *discovery.Service) *chi.Mux {

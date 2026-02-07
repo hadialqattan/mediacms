@@ -13,10 +13,10 @@ import (
 	"github.com/typesense/typesense-go/typesense"
 	"github.com/typesense/typesense-go/typesense/api"
 
-	"thmanyah.com/content-platform/internal/discovery"
-	"thmanyah.com/content-platform/internal/discovery/repository"
-	"thmanyah.com/content-platform/internal/discovery/router"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/discovery"
+	"github.com/hadialqattan/mediacms/internal/discovery/repository"
+	"github.com/hadialqattan/mediacms/internal/discovery/router"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 func TestDiscoveryEndpoints(t *testing.T) {

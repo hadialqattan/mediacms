@@ -23,9 +23,9 @@ type JWTConfig struct {
 
 func Load() *Config {
 	return &Config{
-		ServiceName:      getEnv("SERVICE_NAME", "thmanyah-cms"),
+		ServiceName:      getEnv("SERVICE_NAME", "mediacms-cms"),
 		Port:             getEnv("PORT", "8080"),
-		DatabaseURL:      getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/thmanyah?sslmode=disable"),
+		DatabaseURL:      getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/mediacms?sslmode=disable"),
 		RedisAddr:        getEnv("REDIS_ADDR", "localhost:6379"),
 		TypesenseAddress: getEnv("TYPESENSE_ADDRESS", "http://localhost:8108"),
 		TypesenseAPIKey:  getEnv("TYPESENSE_API_KEY", "xyz"),

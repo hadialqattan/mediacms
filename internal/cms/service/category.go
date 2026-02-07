@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/cms/repository/sqlc"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 func (s *Service) CreateCategory(ctx context.Context, params sqlc.CreateCategoryParams) (*domain.Category, error) {

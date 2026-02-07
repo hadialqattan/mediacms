@@ -1,13 +1,13 @@
 services:
   postgres:
     labels:
-      - "com.thmanyah.project=content-platform"
+      - "com.mediacms.project=content-platform"
     image: postgres:18.1-alpine
-    container_name: thmanyah-postgres
+    container_name: mediacms-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: thmanyah
+      POSTGRES_DB: mediacms
     ports:
       - "5432:5432"
     volumes:
@@ -18,13 +18,13 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - thmanyah-network
+      - mediacms-network
 
   redis:
     labels:
-      - "com.thmanyah.project=content-platform"
+      - "com.mediacms.project=content-platform"
     image: redis:8.4.0-alpine
-    container_name: thmanyah-redis
+    container_name: mediacms-redis
     ports:
       - "6379:6379"
     healthcheck:
@@ -33,13 +33,13 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - thmanyah-network
+      - mediacms-network
 
   typesense:
     labels:
-      - "com.thmanyah.project=content-platform"
+      - "com.mediacms.project=content-platform"
     image: typesense/typesense:30.1
-    container_name: thmanyah-typesense
+    container_name: mediacms-typesense
     environment:
       TYPESENSE_API_KEY: xyz
     ports:
@@ -53,19 +53,19 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - thmanyah-network
+      - mediacms-network
 
   cms-api:
     labels:
-      - "com.thmanyah.project=content-platform"
+      - "com.mediacms.project=content-platform"
     build:
       context: .
       dockerfile: cmd/cms-api/Dockerfile
-    container_name: thmanyah-cms-api
+    container_name: mediacms-cms-api
     environment:
-      SERVICE_NAME: thmanyah-cms-api
+      SERVICE_NAME: mediacms-cms-api
       PORT: 8080
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/thmanyah?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/mediacms?sslmode=disable
       REDIS_ADDR: redis:6379
       TYPESENSE_ADDRESS: http://typesense:8108
       TYPESENSE_API_KEY: xyz
@@ -78,17 +78,17 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - thmanyah-network
+      - mediacms-network
 
   discovery-api:
     labels:
-      - "com.thmanyah.project=content-platform"
+      - "com.mediacms.project=content-platform"
     build:
       context: .
       dockerfile: cmd/discovery-api/Dockerfile
-    container_name: thmanyah-discovery-api
+    container_name: mediacms-discovery-api
     environment:
-      SERVICE_NAME: thmanyah-discovery-api
+      SERVICE_NAME: mediacms-discovery-api
       PORT: 8081
       TYPESENSE_ADDRESS: http://typesense:8108
       TYPESENSE_API_KEY: xyz
@@ -98,18 +98,18 @@ services:
       typesense:
         condition: service_started
     networks:
-      - thmanyah-network
+      - mediacms-network
 
   outbox-relay:
     labels:
-      - "com.thmanyah.project=content-platform"
+      - "com.mediacms.project=content-platform"
     build:
       context: .
       dockerfile: cmd/outbox-relay/Dockerfile
-    container_name: thmanyah-outbox-relay
+    container_name: mediacms-outbox-relay
     environment:
-      SERVICE_NAME: thmanyah-outbox-relay
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/thmanyah?sslmode=disable
+      SERVICE_NAME: mediacms-outbox-relay
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/mediacms?sslmode=disable
       REDIS_ADDR: redis:6379
     depends_on:
       postgres:
@@ -117,18 +117,18 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - thmanyah-network
+      - mediacms-network
 
   search-indexer:
     labels:
-      - "com.thmanyah.project=content-platform"
+      - "com.mediacms.project=content-platform"
     build:
       context: .
       dockerfile: cmd/search-indexer/Dockerfile
-    container_name: thmanyah-search-indexer
+    container_name: mediacms-search-indexer
     environment:
-      SERVICE_NAME: thmanyah-search-indexer
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/thmanyah?sslmode=disable
+      SERVICE_NAME: mediacms-search-indexer
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/mediacms?sslmode=disable
       REDIS_ADDR: redis:6379
       TYPESENSE_ADDRESS: http://typesense:8108
       TYPESENSE_API_KEY: xyz
@@ -140,16 +140,16 @@ services:
       typesense:
         condition: service_started
     networks:
-      - thmanyah-network
+      - mediacms-network
 
 volumes:
   postgres_data:
     labels:
-      - "com.thmanyah.project=content-platform"
+      - "com.mediacms.project=content-platform"
   typesense_data:
     labels:
-      - "com.thmanyah.project=content-platform"
+      - "com.mediacms.project=content-platform"
 
 networks:
-  thmanyah-network:
+  mediacms-network:
     driver: bridge

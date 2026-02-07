@@ -8,10 +8,10 @@ import (
 	"syscall"
 	"time"
 
-	"thmanyah.com/content-platform/config"
-	"thmanyah.com/content-platform/internal/outboxrelay"
-	"thmanyah.com/content-platform/internal/outboxrelay/repository"
-	"thmanyah.com/content-platform/internal/shared/postgres"
+	"github.com/hadialqattan/mediacms/config"
+	"github.com/hadialqattan/mediacms/internal/outboxrelay"
+	"github.com/hadialqattan/mediacms/internal/outboxrelay/repository"
+	"github.com/hadialqattan/mediacms/internal/shared/postgres"
 )
 
 func main() {

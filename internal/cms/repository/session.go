@@ -9,7 +9,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"thmanyah.com/content-platform/config"
+	"github.com/hadialqattan/mediacms/config"
 )
 
 type sessionData struct {

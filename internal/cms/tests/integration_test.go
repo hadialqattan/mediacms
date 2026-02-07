@@ -19,15 +19,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
-	"thmanyah.com/content-platform/config"
-	"thmanyah.com/content-platform/internal/cms/auth"
-	"thmanyah.com/content-platform/internal/cms/handler"
-	"thmanyah.com/content-platform/internal/cms/port"
-	"thmanyah.com/content-platform/internal/cms/repository"
-	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
-	"thmanyah.com/content-platform/internal/cms/router"
-	"thmanyah.com/content-platform/internal/cms/service"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/config"
+	"github.com/hadialqattan/mediacms/internal/cms/auth"
+	"github.com/hadialqattan/mediacms/internal/cms/handler"
+	"github.com/hadialqattan/mediacms/internal/cms/port"
+	"github.com/hadialqattan/mediacms/internal/cms/repository"
+	"github.com/hadialqattan/mediacms/internal/cms/repository/sqlc"
+	"github.com/hadialqattan/mediacms/internal/cms/router"
+	"github.com/hadialqattan/mediacms/internal/cms/service"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 type testSuite struct {
@@ -42,7 +42,7 @@ type testSuite struct {
 func setupTestSuite(t *testing.T) *testSuite {
 	ctx := context.Background()
 
-	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/thmanyah?sslmode=disable")
+	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/mediacms?sslmode=disable")
 	require.NoError(t, err)
 
 	redisClient := redis.NewClient(&redis.Options{Addr: "localhost:6379"})

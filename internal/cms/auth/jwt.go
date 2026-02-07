@@ -5,7 +5,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"thmanyah.com/content-platform/config"
+	"github.com/hadialqattan/mediacms/config"
 )
 
 type JWTManager struct {

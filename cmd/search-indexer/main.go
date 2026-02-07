@@ -8,9 +8,9 @@ import (
 
 	"github.com/typesense/typesense-go/typesense"
 
-	"thmanyah.com/content-platform/config"
-	"thmanyah.com/content-platform/internal/discovery/repository"
-	"thmanyah.com/content-platform/internal/searchindexer"
+	"github.com/hadialqattan/mediacms/config"
+	"github.com/hadialqattan/mediacms/internal/discovery/repository"
+	"github.com/hadialqattan/mediacms/internal/searchindexer"
 )
 
 func main() {

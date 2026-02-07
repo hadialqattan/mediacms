@@ -7,8 +7,8 @@ import (
 
 	"github.com/hibiken/asynq"
 
-	"thmanyah.com/content-platform/internal/searchindexer/port"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/searchindexer/port"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 type Worker struct {

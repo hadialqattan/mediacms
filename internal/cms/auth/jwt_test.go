@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"thmanyah.com/content-platform/config"
+	"github.com/hadialqattan/mediacms/config"
 )
 
 func TestGenerateAccessToken(t *testing.T) {

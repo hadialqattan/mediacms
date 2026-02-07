@@ -11,12 +11,12 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"thmanyah.com/content-platform/config"
-	"thmanyah.com/content-platform/internal/cms/auth"
-	"thmanyah.com/content-platform/internal/cms/repository"
-	"thmanyah.com/content-platform/internal/cms/router"
-	"thmanyah.com/content-platform/internal/cms/service"
-	"thmanyah.com/content-platform/internal/shared/postgres"
+	"github.com/hadialqattan/mediacms/config"
+	"github.com/hadialqattan/mediacms/internal/cms/auth"
+	"github.com/hadialqattan/mediacms/internal/cms/repository"
+	"github.com/hadialqattan/mediacms/internal/cms/router"
+	"github.com/hadialqattan/mediacms/internal/cms/service"
+	"github.com/hadialqattan/mediacms/internal/shared/postgres"
 )
 
 func main() {

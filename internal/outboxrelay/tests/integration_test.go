@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"thmanyah.com/content-platform/internal/cms/repository/sqlc"
-	"thmanyah.com/content-platform/internal/outboxrelay"
-	"thmanyah.com/content-platform/internal/outboxrelay/repository"
-	"thmanyah.com/content-platform/internal/shared/domain"
+	"github.com/hadialqattan/mediacms/internal/cms/repository/sqlc"
+	"github.com/hadialqattan/mediacms/internal/outboxrelay"
+	"github.com/hadialqattan/mediacms/internal/outboxrelay/repository"
+	"github.com/hadialqattan/mediacms/internal/shared/domain"
 )
 
 type testSuite struct {
@@ -32,7 +32,7 @@ type testSuite struct {
 func setupTestSuite(t *testing.T) *testSuite {
 	ctx := context.Background()
 
-	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/thmanyah?sslmode=disable")
+	pool, err := pgxpool.New(ctx, "postgres://postgres:postgres@localhost:5432/mediacms?sslmode=disable")
 	if err != nil {
 		t.Skipf("Database not available: %v", err)
 		return nil

@@ -1,4 +1,4 @@
-module thmanyah.com/content-platform
+module github.com/hadialqattan/mediacms
 
 go 1.25.7
 

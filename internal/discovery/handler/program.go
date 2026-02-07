@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"thmanyah.com/content-platform/internal/discovery"
-	"thmanyah.com/content-platform/internal/discovery/port"
+	"github.com/hadialqattan/mediacms/internal/discovery"
+	"github.com/hadialqattan/mediacms/internal/discovery/port"
 )
 
 type ProgramHandler struct {

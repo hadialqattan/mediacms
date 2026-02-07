@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"thmanyah.com/content-platform/internal/outboxrelay/port"
+	"github.com/hadialqattan/mediacms/internal/outboxrelay/port"
 )
 
 type Relay struct {
