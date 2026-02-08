@@ -35,6 +35,10 @@ tasks:
       - migrate -path migrations -database "postgres://postgres:postgres@localhost:5432/mediacms?sslmode=disable" up
 
   # Docker commands.
+  up:infra:
+    cmds:
+      - docker compose up -d postgres redis typesense
+
   up:
     cmds:
       - docker compose up -d --build
