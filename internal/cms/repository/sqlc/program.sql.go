@@ -105,6 +105,34 @@ func (q *Queries) GetProgramByID(ctx context.Context, id pgtype.UUID) (Program, 
 	return i, err
 }
 
+const getProgramBySlug = `-- name: GetProgramBySlug :one
+SELECT id, slug, title, description, type, language, duration_ms, tags, created_at, updated_at, published_at, deleted_at, created_by, published_by, updated_by, deleted_by FROM programs WHERE slug = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) GetProgramBySlug(ctx context.Context, slug string) (Program, error) {
+	row := q.db.QueryRow(ctx, getProgramBySlug, slug)
+	var i Program
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Title,
+		&i.Description,
+		&i.Type,
+		&i.Language,
+		&i.DurationMs,
+		&i.Tags,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PublishedAt,
+		&i.DeletedAt,
+		&i.CreatedBy,
+		&i.PublishedBy,
+		&i.UpdatedBy,
+		&i.DeletedBy,
+	)
+	return i, err
+}
+
 const listPrograms = `-- name: ListPrograms :many
 SELECT id, slug, title, description, type, language, duration_ms, tags, created_at, updated_at, published_at, deleted_at, created_by, published_by, updated_by, deleted_by FROM programs WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT $1 OFFSET $2
 `

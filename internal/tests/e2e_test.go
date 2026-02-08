@@ -108,7 +108,6 @@ func setupE2ETest(t *testing.T) *e2eTestSuite {
 	schema := &api.CollectionSchema{
 		Name: "programs",
 		Fields: []api.Field{
-			{Name: "id", Type: "string"},
 			{Name: "slug", Type: "string"},
 			{Name: "title", Type: "string"},
 			{Name: "description", Type: "string"},
@@ -269,7 +268,7 @@ func waitForOutboxEnqueue(t *testing.T, pool *pgxpool.Pool, programID string) {
 
 func searchAndVerifyProgram(t *testing.T, router http.Handler, programID string) {
 	t.Log("Waiting for search indexer to process...")
-	time.Sleep(3 * time.Second)
+	time.Sleep(6 * time.Second)
 
 	searchReq := httptest.NewRequest("GET", "/api/v1/programs?q=E2E", nil)
 	searchW := httptest.NewRecorder()

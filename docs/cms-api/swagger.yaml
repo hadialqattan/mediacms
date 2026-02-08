@@ -1,0 +1,573 @@
+basePath: /
+definitions:
+  github_com_hadialqattan_mediacms_internal_cms_service.BulkCreateProgramFailure:
+    properties:
+      error:
+        type: string
+      index:
+        type: integer
+    type: object
+  github_com_hadialqattan_mediacms_internal_cms_service.BulkDeleteProgramFailure:
+    properties:
+      error:
+        type: string
+      id:
+        type: string
+    type: object
+  github_com_hadialqattan_mediacms_internal_shared_domain.Program:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      deleted_at:
+        type: string
+      deleted_by:
+        type: string
+      description:
+        type: string
+      duration_ms:
+        type: integer
+      id:
+        type: string
+      language:
+        $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_shared_domain.ProgramLanguage'
+      published_at:
+        type: string
+      published_by:
+        type: string
+      slug:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      type:
+        $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_shared_domain.ProgramType'
+      updated_at:
+        type: string
+      updated_by:
+        type: string
+    type: object
+  github_com_hadialqattan_mediacms_internal_shared_domain.ProgramLanguage:
+    enum:
+    - ar
+    - en
+    type: string
+    x-enum-varnames:
+    - LanguageAr
+    - LanguageEn
+  github_com_hadialqattan_mediacms_internal_shared_domain.ProgramType:
+    enum:
+    - podcast
+    - documentary
+    type: string
+    x-enum-varnames:
+    - ProgramTypePodcast
+    - ProgramTypeDocumentary
+  internal_cms_handler.BulkCreateRequest:
+    properties:
+      programs:
+        items:
+          $ref: '#/definitions/internal_cms_handler.CreateProgramRequest'
+        type: array
+    type: object
+  internal_cms_handler.BulkCreateResponse:
+    properties:
+      created:
+        items:
+          $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_shared_domain.Program'
+        type: array
+      failed:
+        items:
+          $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_cms_service.BulkCreateProgramFailure'
+        type: array
+    type: object
+  internal_cms_handler.BulkDeleteRequest:
+    properties:
+      ids:
+        items:
+          type: string
+        type: array
+    type: object
+  internal_cms_handler.BulkDeleteResponse:
+    properties:
+      deleted:
+        items:
+          type: string
+        type: array
+      failed:
+        items:
+          $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_cms_service.BulkDeleteProgramFailure'
+        type: array
+    type: object
+  internal_cms_handler.CreateProgramRequest:
+    properties:
+      description:
+        example: A great podcast about technology
+        type: string
+      duration_ms:
+        example: 3600000
+        type: integer
+      language:
+        allOf:
+        - $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_shared_domain.ProgramLanguage'
+        enum:
+        - ar
+        - en
+        example: ar
+      slug:
+        example: my-podcast
+        type: string
+      tags:
+        example:
+        - news
+        - sports
+        items:
+          type: string
+        type: array
+      title:
+        example: My Podcast
+        type: string
+      type:
+        allOf:
+        - $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_shared_domain.ProgramType'
+        enum:
+        - podcast
+        - documentary
+        example: podcast
+    type: object
+  internal_cms_handler.ListProgramsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_shared_domain.Program'
+        type: array
+      meta:
+        $ref: '#/definitions/internal_cms_handler.PaginationMeta'
+    type: object
+  internal_cms_handler.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  internal_cms_handler.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+    type: object
+  internal_cms_handler.PaginationMeta:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+    type: object
+  internal_cms_handler.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  internal_cms_handler.RefreshResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+    type: object
+  internal_cms_handler.UpdateProgramRequest:
+    properties:
+      description:
+        type: string
+      duration_ms:
+        type: integer
+      language:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Content Management System API for MediaCMS
+  title: MediaCMS API
+  version: "1.0"
+paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password, returns access and refresh
+        tokens
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_cms_handler.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_cms_handler.LoginResponse'
+        "401":
+          description: Invalid credentials
+          schema:
+            type: string
+      summary: Login
+      tags:
+      - auth
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Invalidate the refresh token to logout the user
+      parameters:
+      - description: Refresh token to invalidate
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_cms_handler.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+        "401":
+          description: Invalid refresh token
+          schema:
+            type: string
+        "500":
+          description: Failed to logout
+          schema:
+            type: string
+      summary: Logout
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Exchange a valid refresh token for a new access token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_cms_handler.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_cms_handler.RefreshResponse'
+        "401":
+          description: Invalid refresh token
+          schema:
+            type: string
+      summary: Refresh token
+      tags:
+      - auth
+  /api/v1/programs:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of all programs
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_cms_handler.ListProgramsResponse'
+        "500":
+          description: Failed to list programs
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List programs
+      tags:
+      - programs
+    post:
+      consumes:
+      - application/json
+      description: Create a new podcast or documentary program
+      parameters:
+      - description: Program data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_cms_handler.CreateProgramRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_shared_domain.Program'
+        "400":
+          description: Invalid type or language
+          schema:
+            type: string
+        "409":
+          description: Program with this slug already exists
+          schema:
+            type: string
+        "500":
+          description: Failed to create program
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create program
+      tags:
+      - programs
+  /api/v1/programs/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a program by ID (soft delete)
+      parameters:
+      - description: Program ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+        "500":
+          description: Failed to delete program
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Delete program
+      tags:
+      - programs
+    get:
+      consumes:
+      - application/json
+      description: Get a specific program by its ID
+      parameters:
+      - description: Program ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_shared_domain.Program'
+        "404":
+          description: Program not found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get program
+      tags:
+      - programs
+    put:
+      consumes:
+      - application/json
+      description: Update an existing program by ID
+      parameters:
+      - description: Program ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Program update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_cms_handler.UpdateProgramRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_shared_domain.Program'
+        "400":
+          description: Invalid type or language
+          schema:
+            type: string
+        "404":
+          description: Program not found
+          schema:
+            type: string
+        "500":
+          description: Failed to update program
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Update program
+      tags:
+      - programs
+  /api/v1/programs/{id}/publish:
+    post:
+      consumes:
+      - application/json
+      description: Publish a program to make it available in the discovery API
+      parameters:
+      - description: Program ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_hadialqattan_mediacms_internal_shared_domain.Program'
+        "500":
+          description: Failed to publish program
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Publish program
+      tags:
+      - programs
+  /api/v1/programs/bulk:
+    delete:
+      consumes:
+      - application/json
+      description: Delete multiple programs by their IDs
+      parameters:
+      - description: List of program IDs to delete
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_cms_handler.BulkDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "207":
+          description: Multi-Status
+          schema:
+            $ref: '#/definitions/internal_cms_handler.BulkDeleteResponse'
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Bulk delete programs
+      tags:
+      - programs
+    post:
+      consumes:
+      - application/json
+      description: Create multiple programs in a single request
+      parameters:
+      - description: List of programs to create
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_cms_handler.BulkCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "207":
+          description: Multi-Status
+          schema:
+            $ref: '#/definitions/internal_cms_handler.BulkCreateResponse'
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Bulk create programs
+      tags:
+      - programs
+  /api/v1/users:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account with editor role (admin only)
+      parameters:
+      - description: User credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_cms_handler.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_cms_handler.LoginResponse'
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+        "409":
+          description: User with this email already exists
+          schema:
+            type: string
+        "500":
+          description: Failed to create user
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create user
+      tags:
+      - auth
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

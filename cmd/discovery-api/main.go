@@ -8,6 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	_ "github.com/hadialqattan/mediacms/docs/discovery-api"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"github.com/typesense/typesense-go/typesense"
 
 	"github.com/hadialqattan/mediacms/config"
@@ -15,6 +17,13 @@ import (
 	"github.com/hadialqattan/mediacms/internal/discovery/repository"
 	"github.com/hadialqattan/mediacms/internal/discovery/router"
 )
+
+// @title           MediaCMS Discovery API
+// @version         0.0.1
+// @description     Public search and discovery API for MediaCMS programs
+
+// @host      localhost:8081
+// @BasePath  /
 
 func main() {
 	cfg := config.LoadDiscovery()
@@ -28,6 +37,10 @@ func main() {
 	svc := discovery.NewService(searchIndex)
 
 	r := router.NewRouter(svc)
+
+	// Note: This is not supposed to be here (part of router).
+	//		 But for the sake of time, I'll leave it here ;-).
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	server := &http.Server{
 		Addr:    ":" + cfg.Port,

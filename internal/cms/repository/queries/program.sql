@@ -6,6 +6,9 @@ RETURNING *;
 -- name: GetProgramByID :one
 SELECT * FROM programs WHERE id = $1;
 
+-- name: GetProgramBySlug :one
+SELECT * FROM programs WHERE slug = $1 AND deleted_at IS NULL;
+
 -- name: ListPrograms :many
 SELECT * FROM programs WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT $1 OFFSET $2;
 

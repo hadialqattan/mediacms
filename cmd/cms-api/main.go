@@ -8,7 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	_ "github.com/hadialqattan/mediacms/docs/cms-api"
 	"github.com/redis/go-redis/v9"
+	httpSwagger "github.com/swaggo/http-swagger"
 
 	"github.com/hadialqattan/mediacms/config"
 	"github.com/hadialqattan/mediacms/internal/cms/auth"
@@ -17,6 +19,18 @@ import (
 	"github.com/hadialqattan/mediacms/internal/cms/service"
 	"github.com/hadialqattan/mediacms/internal/shared/postgres"
 )
+
+// @title           MediaCMS API
+// @version         0.0.1
+// @description     Content Management System API for MediaCMS
+
+// @host      localhost:8080
+// @BasePath  /
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 
 func main() {
 	cfg := config.LoadCMS()
@@ -52,6 +66,10 @@ func main() {
 	}
 
 	r := router.NewRouter(svc, cfg.JWT)
+
+	// Note: This is not supposed to be here (part of router).
+	//		 But for the sake of time, I'll leave it here ;-).
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
 	server := &http.Server{
 		Addr:    ":" + cfg.Port,

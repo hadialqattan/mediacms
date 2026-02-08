@@ -21,6 +21,68 @@ func NewProgramHandler(service *discovery.Service) *ProgramHandler {
 	}
 }
 
+// ProgramResult represents a program in search results
+type ProgramResult struct {
+	ID          string   `json:"id"`
+	Slug        string   `json:"slug"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Type        string   `json:"type"`
+	Language    string   `json:"language"`
+	DurationMs  int      `json:"duration_ms"`
+	Tags        []string `json:"tags"`
+	PublishedAt int64    `json:"published_at"`
+	CreatedAt   int64    `json:"created_at"`
+}
+
+// SearchFacets represents search facets
+type SearchFacets struct {
+	Type     map[string]int `json:"type,omitempty"`
+	Language map[string]int `json:"language,omitempty"`
+	Tags     map[string]int `json:"tags,omitempty"`
+}
+
+// SearchPagination represents pagination info
+type SearchPagination struct {
+	Total      int `json:"total"`
+	Page       int `json:"page"`
+	PerPage    int `json:"per_page"`
+	TotalPages int `json:"total_pages"`
+}
+
+// SearchProgramsResponse represents the search response
+type SearchProgramsResponse struct {
+	Results    []ProgramResult  `json:"results"`
+	Facets     *SearchFacets    `json:"facets,omitempty"`
+	Pagination SearchPagination `json:"pagination"`
+}
+
+// RecentProgramsResponse represents the recent programs response
+type RecentProgramsResponse struct {
+	Results    []ProgramResult  `json:"results"`
+	Pagination SearchPagination `json:"pagination"`
+}
+
+// FacetsResponse represents the facets response
+type FacetsResponse struct {
+	Facets SearchFacets `json:"facets"`
+}
+
+// SearchPrograms searches programs with filters and pagination
+// @Summary      Search programs
+// @Description  Search programs with filters and pagination
+// @Tags         programs
+// @Accept       json
+// @Produce      json
+// @Param        q query string false "Search query"
+// @Param        page query int false "Page number" minimum(1) default(1)
+// @Param        per_page query int false "Items per page" minimum(1) maximum(100) default(20)
+// @Param        type query string false "Filter by type" Enums(podcast,documentary)
+// @Param        language query string false "Filter by language" Enums(ar,en)
+// @Param        sort query string false "Sort order" Enums(published_at_desc,published_at_asc,relevance)
+// @Param        tags query string false "Filter by tags (comma-separated)"
+// @Success      200 {object} handler.SearchProgramsResponse
+// @Router       /api/v1/programs [get]
 func (h *ProgramHandler) Search(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 	page := 1
@@ -71,6 +133,16 @@ func (h *ProgramHandler) Search(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// GetProgram retrieves a published program by ID
+// @Summary      Get program
+// @Description  Get a specific published program by its ID
+// @Tags         programs
+// @Accept       json
+// @Produce      json
+// @Param        id path string true "Program ID"
+// @Success      200 {object} handler.ProgramResult
+// @Failure      404 {string} string "Program not found"
+// @Router       /api/v1/programs/{id} [get]
 func (h *ProgramHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -102,6 +174,18 @@ func (h *ProgramHandler) Get(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// GetRecentPrograms retrieves recently published programs
+// @Summary      Get recent programs
+// @Description  Get recently published programs with optional filters
+// @Tags         programs
+// @Accept       json
+// @Produce      json
+// @Param        page query int false "Page number" minimum(1) default(1)
+// @Param        per_page query int false "Items per page" minimum(1) maximum(100) default(20)
+// @Param        type query string false "Filter by type" Enums(podcast,documentary)
+// @Param        language query string false "Filter by language" Enums(ar,en)
+// @Success      200 {object} handler.RecentProgramsResponse
+// @Router       /api/v1/programs/recent [get]
 func (h *ProgramHandler) GetRecent(w http.ResponseWriter, r *http.Request) {
 	page := 1
 	perPage := 20
@@ -142,6 +226,14 @@ func (h *ProgramHandler) GetRecent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// GetFacets retrieves available facets for filtering programs
+// @Summary      Get facets
+// @Description  Get available facets (types, languages, tags) for filtering programs
+// @Tags         programs
+// @Accept       json
+// @Produce      json
+// @Success      200 {object} handler.FacetsResponse
+// @Router       /api/v1/programs/facets [get]
 func (h *ProgramHandler) GetFacets(w http.ResponseWriter, r *http.Request) {
 	facets, err := h.service.GetFacets(r.Context())
 	if err != nil {

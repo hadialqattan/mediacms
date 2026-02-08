@@ -15,15 +15,15 @@ import (
 
 const collectionName = "programs"
 
-type searchIndex struct {
+type SearchIndex struct {
 	client *typesense.Client
 }
 
 func NewSearchIndex(client *typesense.Client) port.SearchIndex {
-	return &searchIndex{client: client}
+	return &SearchIndex{client: client}
 }
 
-func (s *searchIndex) UpsertProgram(ctx context.Context, program domain.Program) error {
+func (s *SearchIndex) UpsertProgram(ctx context.Context, program domain.Program) error {
 	if !program.IsPublished() {
 		return nil
 	}
@@ -48,7 +48,7 @@ func (s *searchIndex) UpsertProgram(ctx context.Context, program domain.Program)
 	return nil
 }
 
-func (s *searchIndex) DeleteProgram(ctx context.Context, programID string) error {
+func (s *SearchIndex) DeleteProgram(ctx context.Context, programID string) error {
 	_, err := s.client.Collection(collectionName).Document(programID).Delete(ctx)
 	if err != nil {
 		return fmt.Errorf("deleting document: %w", err)
@@ -56,7 +56,7 @@ func (s *searchIndex) DeleteProgram(ctx context.Context, programID string) error
 	return nil
 }
 
-func (s *searchIndex) SearchPrograms(ctx context.Context, params port.SearchParams) (*port.SearchResult, error) {
+func (s *SearchIndex) SearchPrograms(ctx context.Context, params port.SearchParams) (*port.SearchResult, error) {
 	page := params.Page
 	perPage := params.PerPage
 
@@ -104,7 +104,7 @@ func (s *searchIndex) SearchPrograms(ctx context.Context, params port.SearchPara
 	}, nil
 }
 
-func (s *searchIndex) GetProgram(ctx context.Context, programID string) (*domain.Program, error) {
+func (s *SearchIndex) GetProgram(ctx context.Context, programID string) (*domain.Program, error) {
 	doc, err := s.client.Collection(collectionName).Document(programID).Retrieve(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("retrieving document: %w", err)
@@ -129,7 +129,7 @@ func (s *searchIndex) GetProgram(ctx context.Context, programID string) (*domain
 	return program, nil
 }
 
-func (s *searchIndex) GetRecentPrograms(ctx context.Context, params port.RecentParams) (*port.RecentResult, error) {
+func (s *SearchIndex) GetRecentPrograms(ctx context.Context, params port.RecentParams) (*port.RecentResult, error) {
 	page := params.Page
 	perPage := params.PerPage
 
@@ -168,7 +168,7 @@ func (s *searchIndex) GetRecentPrograms(ctx context.Context, params port.RecentP
 	}, nil
 }
 
-func (s *searchIndex) GetFacets(ctx context.Context) (*port.FacetsResult, error) {
+func (s *SearchIndex) GetFacets(ctx context.Context) (*port.FacetsResult, error) {
 	page := 1
 	perPage := 1
 
@@ -193,7 +193,39 @@ func (s *searchIndex) GetFacets(ctx context.Context) (*port.FacetsResult, error)
 	}, nil
 }
 
-func (s *searchIndex) buildFilter(programType, language *string, tags []string) string {
+func (s *SearchIndex) CreateCollectionIfNotExists(ctx context.Context) error {
+	_, err := s.client.Collection(collectionName).Retrieve(ctx)
+	if err == nil {
+		return nil
+	}
+
+	facet := true
+	publishedAt := "published_at"
+	schema := &api.CollectionSchema{
+		Name: collectionName,
+		Fields: []api.Field{
+			{Name: "slug", Type: "string"},
+			{Name: "title", Type: "string"},
+			{Name: "description", Type: "string"},
+			{Name: "type", Type: "string", Facet: &facet},
+			{Name: "language", Type: "string", Facet: &facet},
+			{Name: "duration_ms", Type: "int32"},
+			{Name: "tags", Type: "string[]", Facet: &facet},
+			{Name: "published_at", Type: "int64"},
+			{Name: "created_at", Type: "int64"},
+		},
+		DefaultSortingField: &publishedAt,
+	}
+
+	_, err = s.client.Collections().Create(ctx, schema)
+	if err != nil {
+		return fmt.Errorf("creating collection: %w", err)
+	}
+
+	return nil
+}
+
+func (s *SearchIndex) buildFilter(programType, language *string, tags []string) string {
 	filter := ""
 
 	if programType != nil {
@@ -224,7 +256,7 @@ func (s *searchIndex) buildFilter(programType, language *string, tags []string) 
 	return filter
 }
 
-func (s *searchIndex) buildSort(sort *string) string {
+func (s *SearchIndex) buildSort(sort *string) string {
 	if sort == nil {
 		return ""
 	}
@@ -241,7 +273,7 @@ func (s *searchIndex) buildSort(sort *string) string {
 	}
 }
 
-func (s *searchIndex) extractPrograms(result *api.SearchResult) []port.ProgramResult {
+func (s *SearchIndex) extractPrograms(result *api.SearchResult) []port.ProgramResult {
 	programs := make([]port.ProgramResult, 0)
 	if result.Hits != nil {
 		for _, hit := range *result.Hits {
@@ -266,7 +298,7 @@ func (s *searchIndex) extractPrograms(result *api.SearchResult) []port.ProgramRe
 	return programs
 }
 
-func (s *searchIndex) extractFacets(result *api.SearchResult) *port.Facets {
+func (s *SearchIndex) extractFacets(result *api.SearchResult) *port.Facets {
 	facets := &port.Facets{
 		Type:     make(map[string]int),
 		Language: make(map[string]int),

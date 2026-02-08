@@ -21,6 +21,10 @@ func (s *Service) GetProgram(ctx context.Context, id string) (*domain.Program, e
 	return s.programRepo.GetByID(ctx, id)
 }
 
+func (s *Service) GetProgramBySlug(ctx context.Context, slug string) (*domain.Program, error) {
+	return s.programRepo.GetBySlug(ctx, slug)
+}
+
 func (s *Service) ListPrograms(ctx context.Context, limit, offset int) ([]*domain.Program, error) {
 	programs, err := s.programRepo.List(ctx, limit, offset)
 	if err != nil {
@@ -119,6 +123,15 @@ func (s *Service) BulkCreatePrograms(ctx context.Context, programs []sqlc.Create
 			failures = append(failures, BulkCreateProgramFailure{
 				Index: i,
 				Error: "invalid language: must be 'ar' or 'en'",
+			})
+			continue
+		}
+
+		// Check if slug already exists
+		if _, err := s.programRepo.GetBySlug(ctx, prog.Slug); err == nil {
+			failures = append(failures, BulkCreateProgramFailure{
+				Index: i,
+				Error: "program with this slug already exists",
 			})
 			continue
 		}

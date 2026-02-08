@@ -49,6 +49,15 @@ func (r *programRepo) GetByID(ctx context.Context, id string) (*domain.Program, 
 	return r.domainProgram(program), nil
 }
 
+func (r *programRepo) GetBySlug(ctx context.Context, slug string) (*domain.Program, error) {
+	program, err := r.queries.GetProgramBySlug(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.domainProgram(program), nil
+}
+
 func (r *programRepo) List(ctx context.Context, limit, offset int) ([]*domain.Program, error) {
 	programs, err := r.queries.ListPrograms(ctx, sqlc.ListProgramsParams{
 		Limit:  int32(limit),

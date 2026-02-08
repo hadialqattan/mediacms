@@ -1,0 +1,228 @@
+basePath: /
+definitions:
+  internal_discovery_handler.FacetsResponse:
+    properties:
+      facets:
+        $ref: '#/definitions/internal_discovery_handler.SearchFacets'
+    type: object
+  internal_discovery_handler.ProgramResult:
+    properties:
+      created_at:
+        type: integer
+      description:
+        type: string
+      duration_ms:
+        type: integer
+      id:
+        type: string
+      language:
+        type: string
+      published_at:
+        type: integer
+      slug:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  internal_discovery_handler.RecentProgramsResponse:
+    properties:
+      pagination:
+        $ref: '#/definitions/internal_discovery_handler.SearchPagination'
+      results:
+        items:
+          $ref: '#/definitions/internal_discovery_handler.ProgramResult'
+        type: array
+    type: object
+  internal_discovery_handler.SearchFacets:
+    properties:
+      language:
+        additionalProperties:
+          type: integer
+        type: object
+      tags:
+        additionalProperties:
+          type: integer
+        type: object
+      type:
+        additionalProperties:
+          type: integer
+        type: object
+    type: object
+  internal_discovery_handler.SearchPagination:
+    properties:
+      page:
+        type: integer
+      per_page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  internal_discovery_handler.SearchProgramsResponse:
+    properties:
+      facets:
+        $ref: '#/definitions/internal_discovery_handler.SearchFacets'
+      pagination:
+        $ref: '#/definitions/internal_discovery_handler.SearchPagination'
+      results:
+        items:
+          $ref: '#/definitions/internal_discovery_handler.ProgramResult'
+        type: array
+    type: object
+host: localhost:8081
+info:
+  contact: {}
+  description: Public search and discovery API for MediaCMS programs
+  title: MediaCMS Discovery API
+  version: "1.0"
+paths:
+  /api/v1/programs:
+    get:
+      consumes:
+      - application/json
+      description: Search programs with filters and pagination
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - description: Filter by type
+        enum:
+        - podcast
+        - documentary
+        in: query
+        name: type
+        type: string
+      - description: Filter by language
+        enum:
+        - ar
+        - en
+        in: query
+        name: language
+        type: string
+      - description: Sort order
+        enum:
+        - published_at_desc
+        - published_at_asc
+        - relevance
+        in: query
+        name: sort
+        type: string
+      - description: Filter by tags (comma-separated)
+        in: query
+        name: tags
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_discovery_handler.SearchProgramsResponse'
+      summary: Search programs
+      tags:
+      - programs
+  /api/v1/programs/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get a specific published program by its ID
+      parameters:
+      - description: Program ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_discovery_handler.ProgramResult'
+        "404":
+          description: Program not found
+          schema:
+            type: string
+      summary: Get program
+      tags:
+      - programs
+  /api/v1/programs/facets:
+    get:
+      consumes:
+      - application/json
+      description: Get available facets (types, languages, tags) for filtering programs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_discovery_handler.FacetsResponse'
+      summary: Get facets
+      tags:
+      - programs
+  /api/v1/programs/recent:
+    get:
+      consumes:
+      - application/json
+      description: Get recently published programs with optional filters
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        maximum: 100
+        minimum: 1
+        name: per_page
+        type: integer
+      - description: Filter by type
+        enum:
+        - podcast
+        - documentary
+        in: query
+        name: type
+        type: string
+      - description: Filter by language
+        enum:
+        - ar
+        - en
+        in: query
+        name: language
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_discovery_handler.RecentProgramsResponse'
+      summary: Get recent programs
+      tags:
+      - programs
+swagger: "2.0"

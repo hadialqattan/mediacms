@@ -36,8 +36,6 @@ func setupTestSuite(t *testing.T) *testSuite {
 		typesense.WithAPIKey("xyz"),
 	)
 
-	// Create collection schema
-	idField := "id"
 	slugField := "slug"
 	titleField := "title"
 	descField := "description"
@@ -52,7 +50,6 @@ func setupTestSuite(t *testing.T) *testSuite {
 	schema := &api.CollectionSchema{
 		Name: "programs",
 		Fields: []api.Field{
-			{Name: idField, Type: "string"},
 			{Name: slugField, Type: "string"},
 			{Name: titleField, Type: "string"},
 			{Name: descField, Type: "string"},
@@ -66,10 +63,8 @@ func setupTestSuite(t *testing.T) *testSuite {
 		DefaultSortingField: &pubField,
 	}
 
-	// Delete collection if it exists
 	_, _ = client.Collection("programs").Delete(ctx)
 
-	// Create fresh collection
 	_, err := client.Collections().Create(ctx, schema)
 	require.NoError(t, err, "Failed to create Typesense collection")
 

@@ -32,6 +32,16 @@ type LoginResponse struct {
 	ExpiresIn    int64  `json:"expires_in"`
 }
 
+// Login authenticates a user and returns JWT tokens
+// @Summary      Login
+// @Description  Authenticate user with email and password, returns access and refresh tokens
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body handler.LoginRequest true "Login credentials"
+// @Success      200 {object} handler.LoginResponse
+// @Failure      401 {string} string "Invalid credentials"
+// @Router       /api/v1/auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -55,10 +65,28 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// CreateUser creates a new user account (admin only)
+// @Summary      Create user
+// @Description  Create a new user account with editor role (admin only)
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request body handler.LoginRequest true "User credentials"
+// @Success      200 {object} handler.LoginResponse
+// @Failure      400 {string} string "Invalid request"
+// @Failure      409 {string} string "User with this email already exists"
+// @Failure      500 {string} string "Failed to create user"
+// @Router       /api/v1/users [post]
 func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.svc.GetUserByEmail(r.Context(), req.Email); err == nil {
+		http.Error(w, "User with this email already exists", http.StatusConflict)
 		return
 	}
 
@@ -97,6 +125,16 @@ type RefreshResponse struct {
 	ExpiresIn   int64  `json:"expires_in"`
 }
 
+// Refresh exchanges a refresh token for a new access token
+// @Summary      Refresh token
+// @Description  Exchange a valid refresh token for a new access token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body handler.RefreshRequest true "Refresh token"
+// @Success      200 {object} handler.RefreshResponse
+// @Failure      401 {string} string "Invalid refresh token"
+// @Router       /api/v1/auth/refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	var req RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -123,6 +161,17 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Logout invalidates the refresh token
+// @Summary      Logout
+// @Description  Invalidate the refresh token to logout the user
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request body handler.RefreshRequest true "Refresh token to invalidate"
+// @Success      204 "No content"
+// @Failure      401 {string} string "Invalid refresh token"
+// @Failure      500 {string} string "Failed to logout"
+// @Router       /api/v1/auth/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	var req RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

@@ -47,11 +47,6 @@ services:
     volumes:
       - typesense_data:/data
     command: "--api-key=xyz --data-dir=/data --enable-cors"
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 5 nc -z localhost 8108 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - mediacms-network
 
