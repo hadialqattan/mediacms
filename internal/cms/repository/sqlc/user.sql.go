@@ -12,9 +12,16 @@ import (
 )
 
 const countUsers = `-- name: CountUsers :one
-SELECT COUNT(*) FROM users
+SELECT
+    COUNT(*)
+FROM
+    users
 `
 
+// Note: This is needed to determine if we should create the
+//
+//	default admin. It can be optimized by limiting the
+//	query to 1 (check if table is empty or not).
 func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, countUsers)
 	var count int64
@@ -23,9 +30,10 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password_hash, role)
-VALUES ($1, $2, $3)
-RETURNING id, email, password_hash, role, created_at
+INSERT INTO
+    users (email, password_hash, role)
+VALUES
+    ($1, $2, $3) RETURNING id, email, password_hash, role, created_at
 `
 
 type CreateUserParams struct {
@@ -48,7 +56,12 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, role, created_at FROM users WHERE email = $1
+SELECT
+    id, email, password_hash, role, created_at
+FROM
+    users
+WHERE
+    email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -65,7 +78,12 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, role, created_at FROM users WHERE id = $1
+SELECT
+    id, email, password_hash, role, created_at
+FROM
+    users
+WHERE
+    id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {

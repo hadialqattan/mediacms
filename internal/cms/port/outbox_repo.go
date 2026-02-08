@@ -10,6 +10,6 @@ import (
 )
 
 type OutboxRepo interface {
-	Create(ctx context.Context, params sqlc.CreateOutboxEventParams) (*domain.OutboxEvent, error)
 	WithTx(tx pgx.Tx) OutboxRepo
+	Create(ctx context.Context, params sqlc.CreateOutboxEventParams) (*domain.OutboxEvent, error)
 }

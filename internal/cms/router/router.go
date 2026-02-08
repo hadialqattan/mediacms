@@ -15,7 +15,7 @@ func NewRouter(svc *service.Service, jwtCfg config.JWTConfig) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"*"}, // For now, for simplicity.
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
@@ -24,11 +24,12 @@ func NewRouter(svc *service.Service, jwtCfg config.JWTConfig) *chi.Mux {
 
 	jwtManager := auth.NewJWTManager(jwtCfg)
 
+	healthHandler := handler.NewHealthHandler()
 	authHandler := handler.NewAuthHandler(svc, jwtManager)
-	programHandler := handler.NewProgramHandler(svc)
-	categoryHandler := handler.NewCategoryHandler(svc)
-	importHandler := handler.NewImportHandler(svc)
 	userHandler := handler.NewUserHandler(svc)
+	programHandler := handler.NewProgramHandler(svc)
+
+	r.Get("/health", healthHandler.Health)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
@@ -38,29 +39,21 @@ func NewRouter(svc *service.Service, jwtCfg config.JWTConfig) *chi.Mux {
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.JWTAuth(jwtManager))
 			r.Use(middleware.RequireAdmin(jwtManager))
 			r.Post("/users", userHandler.CreateUser)
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.JWTAuth(jwtManager))
 			r.Use(middleware.RequireAdminOrEditor(jwtManager))
 
 			r.Get("/programs", programHandler.List)
 			r.Post("/programs", programHandler.Create)
+			r.Post("/programs/bulk", programHandler.BulkCreate)
+			r.Delete("/programs/bulk", programHandler.BulkDelete)
 			r.Get("/programs/{id}", programHandler.Get)
 			r.Put("/programs/{id}", programHandler.Update)
 			r.Post("/programs/{id}/publish", programHandler.Publish)
 			r.Delete("/programs/{id}", programHandler.Delete)
-			r.Put("/programs/{id}/categories", programHandler.AssignCategories)
-			r.Get("/programs/{id}/categories", programHandler.GetCategories)
-
-			r.Get("/categories", categoryHandler.List)
-			r.Post("/categories", categoryHandler.Create)
-			r.Get("/categories/{id}", categoryHandler.Get)
-
-			r.Post("/import", importHandler.Import)
 		})
 	})
 

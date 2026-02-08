@@ -8,17 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type CategorizedA struct {
-	ProgramID  pgtype.UUID `json:"program_id"`
-	CategoryID pgtype.UUID `json:"category_id"`
-}
-
-type Category struct {
-	ID          pgtype.UUID `json:"id"`
-	Name        string      `json:"name"`
-	Description pgtype.Text `json:"description"`
-}
-
 type OutboxEvent struct {
 	ID        pgtype.UUID      `json:"id"`
 	Type      string           `json:"type"`
@@ -36,21 +25,15 @@ type Program struct {
 	Type        string           `json:"type"`
 	Language    string           `json:"language"`
 	DurationMs  int32            `json:"duration_ms"`
+	Tags        []string         `json:"tags"`
 	CreatedAt   pgtype.Timestamp `json:"created_at"`
 	UpdatedAt   pgtype.Timestamp `json:"updated_at"`
 	PublishedAt pgtype.Timestamp `json:"published_at"`
 	DeletedAt   pgtype.Timestamp `json:"deleted_at"`
-	SourceID    pgtype.UUID      `json:"source_id"`
 	CreatedBy   pgtype.UUID      `json:"created_by"`
 	PublishedBy pgtype.UUID      `json:"published_by"`
 	UpdatedBy   pgtype.UUID      `json:"updated_by"`
 	DeletedBy   pgtype.UUID      `json:"deleted_by"`
-}
-
-type Source struct {
-	ID       pgtype.UUID `json:"id"`
-	Type     string      `json:"type"`
-	Metadata []byte      `json:"metadata"`
 }
 
 type User struct {

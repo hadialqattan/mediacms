@@ -11,26 +11,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const assignCategories = `-- name: AssignCategories :exec
-INSERT INTO categorized_as (program_id, category_id)
-VALUES ($1, unnest($2::uuid[]))
-ON CONFLICT (program_id, category_id) DO NOTHING
-`
-
-type AssignCategoriesParams struct {
-	ProgramID pgtype.UUID   `json:"program_id"`
-	Column2   []pgtype.UUID `json:"column_2"`
-}
-
-func (q *Queries) AssignCategories(ctx context.Context, arg AssignCategoriesParams) error {
-	_, err := q.db.Exec(ctx, assignCategories, arg.ProgramID, arg.Column2)
-	return err
-}
-
 const createProgram = `-- name: CreateProgram :one
-INSERT INTO programs (slug, title, description, type, language, duration_ms, source_id, created_by)
+INSERT INTO programs (slug, title, description, type, language, duration_ms, tags, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, slug, title, description, type, language, duration_ms, created_at, updated_at, published_at, deleted_at, source_id, created_by, published_by, updated_by, deleted_by
+RETURNING id, slug, title, description, type, language, duration_ms, tags, created_at, updated_at, published_at, deleted_at, created_by, published_by, updated_by, deleted_by
 `
 
 type CreateProgramParams struct {
@@ -40,7 +24,7 @@ type CreateProgramParams struct {
 	Type        string      `json:"type"`
 	Language    string      `json:"language"`
 	DurationMs  int32       `json:"duration_ms"`
-	SourceID    pgtype.UUID `json:"source_id"`
+	Tags        []string    `json:"tags"`
 	CreatedBy   pgtype.UUID `json:"created_by"`
 }
 
@@ -52,7 +36,7 @@ func (q *Queries) CreateProgram(ctx context.Context, arg CreateProgramParams) (P
 		arg.Type,
 		arg.Language,
 		arg.DurationMs,
-		arg.SourceID,
+		arg.Tags,
 		arg.CreatedBy,
 	)
 	var i Program
@@ -64,11 +48,11 @@ func (q *Queries) CreateProgram(ctx context.Context, arg CreateProgramParams) (P
 		&i.Type,
 		&i.Language,
 		&i.DurationMs,
+		&i.Tags,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.DeletedAt,
-		&i.SourceID,
 		&i.CreatedBy,
 		&i.PublishedBy,
 		&i.UpdatedBy,
@@ -94,7 +78,7 @@ func (q *Queries) DeleteProgram(ctx context.Context, arg DeleteProgramParams) er
 }
 
 const getProgramByID = `-- name: GetProgramByID :one
-SELECT id, slug, title, description, type, language, duration_ms, created_at, updated_at, published_at, deleted_at, source_id, created_by, published_by, updated_by, deleted_by FROM programs WHERE id = $1
+SELECT id, slug, title, description, type, language, duration_ms, tags, created_at, updated_at, published_at, deleted_at, created_by, published_by, updated_by, deleted_by FROM programs WHERE id = $1
 `
 
 func (q *Queries) GetProgramByID(ctx context.Context, id pgtype.UUID) (Program, error) {
@@ -108,79 +92,30 @@ func (q *Queries) GetProgramByID(ctx context.Context, id pgtype.UUID) (Program, 
 		&i.Type,
 		&i.Language,
 		&i.DurationMs,
+		&i.Tags,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.DeletedAt,
-		&i.SourceID,
 		&i.CreatedBy,
 		&i.PublishedBy,
 		&i.UpdatedBy,
 		&i.DeletedBy,
 	)
 	return i, err
-}
-
-const getProgramBySlug = `-- name: GetProgramBySlug :one
-SELECT id, slug, title, description, type, language, duration_ms, created_at, updated_at, published_at, deleted_at, source_id, created_by, published_by, updated_by, deleted_by FROM programs WHERE slug = $1
-`
-
-func (q *Queries) GetProgramBySlug(ctx context.Context, slug string) (Program, error) {
-	row := q.db.QueryRow(ctx, getProgramBySlug, slug)
-	var i Program
-	err := row.Scan(
-		&i.ID,
-		&i.Slug,
-		&i.Title,
-		&i.Description,
-		&i.Type,
-		&i.Language,
-		&i.DurationMs,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.PublishedAt,
-		&i.DeletedAt,
-		&i.SourceID,
-		&i.CreatedBy,
-		&i.PublishedBy,
-		&i.UpdatedBy,
-		&i.DeletedBy,
-	)
-	return i, err
-}
-
-const getProgramCategories = `-- name: GetProgramCategories :many
-SELECT c.id, c.name, c.description FROM categories c
-JOIN categorized_as ca ON c.id = ca.category_id
-WHERE ca.program_id = $1
-`
-
-func (q *Queries) GetProgramCategories(ctx context.Context, programID pgtype.UUID) ([]Category, error) {
-	rows, err := q.db.Query(ctx, getProgramCategories, programID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Category{}
-	for rows.Next() {
-		var i Category
-		if err := rows.Scan(&i.ID, &i.Name, &i.Description); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listPrograms = `-- name: ListPrograms :many
-SELECT id, slug, title, description, type, language, duration_ms, created_at, updated_at, published_at, deleted_at, source_id, created_by, published_by, updated_by, deleted_by FROM programs WHERE deleted_at IS NULL ORDER BY created_at DESC
+SELECT id, slug, title, description, type, language, duration_ms, tags, created_at, updated_at, published_at, deleted_at, created_by, published_by, updated_by, deleted_by FROM programs WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT $1 OFFSET $2
 `
 
-func (q *Queries) ListPrograms(ctx context.Context) ([]Program, error) {
-	rows, err := q.db.Query(ctx, listPrograms)
+type ListProgramsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+func (q *Queries) ListPrograms(ctx context.Context, arg ListProgramsParams) ([]Program, error) {
+	rows, err := q.db.Query(ctx, listPrograms, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -196,11 +131,11 @@ func (q *Queries) ListPrograms(ctx context.Context) ([]Program, error) {
 			&i.Type,
 			&i.Language,
 			&i.DurationMs,
+			&i.Tags,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.PublishedAt,
 			&i.DeletedAt,
-			&i.SourceID,
 			&i.CreatedBy,
 			&i.PublishedBy,
 			&i.UpdatedBy,
@@ -218,9 +153,9 @@ func (q *Queries) ListPrograms(ctx context.Context) ([]Program, error) {
 
 const publishProgram = `-- name: PublishProgram :one
 UPDATE programs
-SET published_at = NOW(), published_by = $2, updated_at = NOW()
+SET published_at = NOW(), published_by = $2
 WHERE id = $1
-RETURNING id, slug, title, description, type, language, duration_ms, created_at, updated_at, published_at, deleted_at, source_id, created_by, published_by, updated_by, deleted_by
+RETURNING id, slug, title, description, type, language, duration_ms, tags, created_at, updated_at, published_at, deleted_at, created_by, published_by, updated_by, deleted_by
 `
 
 type PublishProgramParams struct {
@@ -239,32 +174,17 @@ func (q *Queries) PublishProgram(ctx context.Context, arg PublishProgramParams) 
 		&i.Type,
 		&i.Language,
 		&i.DurationMs,
+		&i.Tags,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.DeletedAt,
-		&i.SourceID,
 		&i.CreatedBy,
 		&i.PublishedBy,
 		&i.UpdatedBy,
 		&i.DeletedBy,
 	)
 	return i, err
-}
-
-const removeCategories = `-- name: RemoveCategories :exec
-DELETE FROM categorized_as
-WHERE program_id = $1 AND category_id = ANY($2::uuid[])
-`
-
-type RemoveCategoriesParams struct {
-	ProgramID pgtype.UUID   `json:"program_id"`
-	Column2   []pgtype.UUID `json:"column_2"`
-}
-
-func (q *Queries) RemoveCategories(ctx context.Context, arg RemoveCategoriesParams) error {
-	_, err := q.db.Exec(ctx, removeCategories, arg.ProgramID, arg.Column2)
-	return err
 }
 
 const updateProgram = `-- name: UpdateProgram :one
@@ -275,10 +195,11 @@ SET
   type = COALESCE($4, type),
   language = COALESCE($5, language),
   duration_ms = COALESCE($6, duration_ms),
+  tags = COALESCE($7, tags),
   updated_at = NOW(),
-  updated_by = $7
+  updated_by = $8
 WHERE id = $1
-RETURNING id, slug, title, description, type, language, duration_ms, created_at, updated_at, published_at, deleted_at, source_id, created_by, published_by, updated_by, deleted_by
+RETURNING id, slug, title, description, type, language, duration_ms, tags, created_at, updated_at, published_at, deleted_at, created_by, published_by, updated_by, deleted_by
 `
 
 type UpdateProgramParams struct {
@@ -288,6 +209,7 @@ type UpdateProgramParams struct {
 	Type        string      `json:"type"`
 	Language    string      `json:"language"`
 	DurationMs  int32       `json:"duration_ms"`
+	Tags        []string    `json:"tags"`
 	UpdatedBy   pgtype.UUID `json:"updated_by"`
 }
 
@@ -299,6 +221,7 @@ func (q *Queries) UpdateProgram(ctx context.Context, arg UpdateProgramParams) (P
 		arg.Type,
 		arg.Language,
 		arg.DurationMs,
+		arg.Tags,
 		arg.UpdatedBy,
 	)
 	var i Program
@@ -310,11 +233,11 @@ func (q *Queries) UpdateProgram(ctx context.Context, arg UpdateProgramParams) (P
 		&i.Type,
 		&i.Language,
 		&i.DurationMs,
+		&i.Tags,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.PublishedAt,
 		&i.DeletedAt,
-		&i.SourceID,
 		&i.CreatedBy,
 		&i.PublishedBy,
 		&i.UpdatedBy,

@@ -6,12 +6,6 @@ CREATE TABLE users (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE sources (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    type VARCHAR(50) NOT NULL CHECK (type IN ('youtube')),
-    metadata JSONB
-);
-
 CREATE TABLE programs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug VARCHAR(255) UNIQUE NOT NULL,
@@ -20,27 +14,15 @@ CREATE TABLE programs (
     type VARCHAR(50) NOT NULL CHECK (type IN ('podcast', 'documentary')),
     language VARCHAR(5) NOT NULL CHECK (language IN ('ar', 'en')),
     duration_ms INTEGER NOT NULL,
+    tags TEXT [] DEFAULT ARRAY [] :: TEXT [],
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP,
     published_at TIMESTAMP,
     deleted_at TIMESTAMP,
-    source_id UUID REFERENCES sources(id),
     created_by UUID NOT NULL REFERENCES users(id),
     published_by UUID REFERENCES users(id),
     updated_by UUID REFERENCES users(id),
     deleted_by UUID REFERENCES users(id)
-);
-
-CREATE TABLE categories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(100) UNIQUE NOT NULL,
-    description TEXT
-);
-
-CREATE TABLE categorized_as (
-    program_id UUID NOT NULL REFERENCES programs(id),
-    category_id UUID NOT NULL REFERENCES categories(id),
-    PRIMARY KEY (program_id, category_id)
 );
 
 CREATE TABLE outbox_events (

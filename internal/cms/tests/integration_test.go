@@ -6,9 +6,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -22,7 +22,6 @@ import (
 	"github.com/hadialqattan/mediacms/config"
 	"github.com/hadialqattan/mediacms/internal/cms/auth"
 	"github.com/hadialqattan/mediacms/internal/cms/handler"
-	"github.com/hadialqattan/mediacms/internal/cms/port"
 	"github.com/hadialqattan/mediacms/internal/cms/repository"
 	"github.com/hadialqattan/mediacms/internal/cms/repository/sqlc"
 	"github.com/hadialqattan/mediacms/internal/cms/router"
@@ -34,7 +33,6 @@ type testSuite struct {
 	pool        *pgxpool.Pool
 	redisClient *redis.Client
 	svc         *service.Service
-	sourceRepo  port.SourceRepo
 	testRouter  *chi.Mux
 	cleanupFunc func()
 }
@@ -56,8 +54,6 @@ func setupTestSuite(t *testing.T) *testSuite {
 	redisClient.FlushDB(ctx)
 
 	programRepo := repository.NewProgramRepo(pool)
-	categoryRepo := repository.NewCategoryRepo(pool)
-	sourceRepo := repository.NewSourceRepo(pool)
 	outboxRepo := repository.NewOutboxRepo(pool)
 	userRepo := repository.NewUserRepo(pool)
 
@@ -69,14 +65,13 @@ func setupTestSuite(t *testing.T) *testSuite {
 
 	sessionRepo := repository.NewSessionRepo(redisClient, cfg)
 	jwtManager := auth.NewJWTManager(cfg)
-	svc := service.NewService(programRepo, categoryRepo, sourceRepo, outboxRepo, userRepo, sessionRepo, jwtManager, pool)
+	svc := service.NewService(programRepo, outboxRepo, userRepo, sessionRepo, jwtManager, pool)
 	testRouter := router.NewRouter(svc, cfg)
 
 	return &testSuite{
 		pool:        pool,
 		redisClient: redisClient,
 		svc:         svc,
-		sourceRepo:  sourceRepo,
 		testRouter:  testRouter,
 		cleanupFunc: func() {
 			cleanupTestData(ctx, pool)
@@ -119,26 +114,15 @@ func loginUser(t *testing.T, testRouter http.Handler, email, password string) *h
 	return &loginResp
 }
 
-func createTestCategory(t *testing.T, testRouter http.Handler, accessToken, name, description string) map[string]interface{} {
-	createReq := handler.CreateCategoryRequest{Name: name, Description: description}
-	body, _ := json.Marshal(createReq)
-
-	w := makeRequest("POST", "/api/v1/categories", body, accessToken, testRouter)
-	require.Equal(t, http.StatusCreated, w.Code)
-
-	var category map[string]interface{}
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &category))
-	return category
-}
-
-func createTestProgram(t *testing.T, testRouter http.Handler, accessToken, slug string) map[string]interface{} {
-	createReq := handler.CreateProgramRequest{
-		Slug:        slug,
-		Title:       "Test Program",
-		Description: "A test program",
-		Type:        "podcast",
-		Language:    "en",
-		DurationMs:  3600000,
+func createTestProgram(t *testing.T, testRouter http.Handler, accessToken, slug string, tags []string) map[string]interface{} {
+	createReq := map[string]interface{}{
+		"slug":        slug,
+		"title":       "Test Program",
+		"description": "A test program",
+		"type":        "podcast",
+		"language":    "en",
+		"duration_ms": 3600000,
+		"tags":        tags,
 	}
 	body, _ := json.Marshal(createReq)
 
@@ -153,11 +137,8 @@ func createTestProgram(t *testing.T, testRouter http.Handler, accessToken, slug 
 func cleanupTestData(ctx context.Context, pool *pgxpool.Pool) {
 	// TODO: Use testing containers and remove this function.
 	pool.Exec(ctx, "DELETE FROM outbox_events")
-	pool.Exec(ctx, "DELETE FROM categorized_as")
 	pool.Exec(ctx, "DELETE FROM programs")
-	pool.Exec(ctx, "DELETE FROM categories")
 	pool.Exec(ctx, "DELETE FROM users WHERE email LIKE 'test-%@example.com'")
-	pool.Exec(ctx, "DELETE FROM users WHERE email LIKE 'editor-test%@example.com'")
 }
 
 func makeRequest(method, path string, body []byte, accessToken string, testRouter http.Handler) *httptest.ResponseRecorder {
@@ -169,6 +150,28 @@ func makeRequest(method, path string, body []byte, accessToken string, testRoute
 	w := httptest.NewRecorder()
 	testRouter.ServeHTTP(w, req)
 	return w
+}
+
+func TestHealthEndpoint(t *testing.T) {
+	suite := setupTestSuite(t)
+	if suite == nil {
+		return
+	}
+	defer suite.cleanupFunc()
+
+	t.Run("GET /health - Health check", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/health", nil)
+		w := httptest.NewRecorder()
+		suite.testRouter.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, "ok", response["status"])
+		assert.Equal(t, "cms-api", response["service"])
+		assert.NotNil(t, response["timestamp"])
+	})
 }
 
 func TestAuthEndpoints(t *testing.T) {
@@ -194,19 +197,6 @@ func TestAuthEndpoints(t *testing.T) {
 
 		w := makeRequest("POST", "/api/v1/auth/login", body, "", suite.testRouter)
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
-	})
-
-	t.Run("POST /api/v1/auth/register - New user registration", func(t *testing.T) {
-		registerReq := handler.LoginRequest{Email: "test-user-3-auth@example.com", Password: "newpassword123"}
-		body, _ := json.Marshal(registerReq)
-
-		w := makeRequest("POST", "/api/v1/auth/register", body, "", suite.testRouter)
-		assert.Equal(t, http.StatusOK, w.Code)
-
-		var registerResp handler.LoginResponse
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &registerResp))
-		assert.NotEmpty(t, registerResp.AccessToken)
-		assert.NotEmpty(t, registerResp.RefreshToken)
 	})
 
 	t.Run("POST /api/v1/auth/refresh - Valid refresh token", func(t *testing.T) {
@@ -278,65 +268,69 @@ func TestProgramCRUD(t *testing.T) {
 		loginResp := loginUser(t, suite.testRouter, "test-user-1-crud@example.com", "password123")
 
 		slug := "test-program-crud-1"
-		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug)
+		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug, []string{"news", "politics"})
 
 		assert.Equal(t, slug, program["slug"])
 		assert.Equal(t, "Test Program", program["title"])
 		assert.NotEmpty(t, program["id"])
+		assert.NotEmpty(t, program["tags"])
 	})
 
 	t.Run("GET /api/v1/programs - List programs", func(t *testing.T) {
 		createTestUser(t, suite.svc, "test-user-2-crud@example.com", "password123")
 		loginResp := loginUser(t, suite.testRouter, "test-user-2-crud@example.com", "password123")
-		createTestProgram(t, suite.testRouter, loginResp.AccessToken, "test-program-crud-2")
+		createTestProgram(t, suite.testRouter, loginResp.AccessToken, "test-program-crud-2", []string{"tech"})
 
 		w := makeRequest("GET", "/api/v1/programs", nil, loginResp.AccessToken, suite.testRouter)
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var programs []map[string]interface{}
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &programs))
-		assert.GreaterOrEqual(t, len(programs), 1)
+		var response map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		data, ok := response["data"].([]interface{})
+		assert.True(t, ok)
+		assert.GreaterOrEqual(t, len(data), 1)
 	})
 
-	t.Run("GET /api/v1/programs/{slug} - Get program by slug", func(t *testing.T) {
+	t.Run("GET /api/v1/programs/{id} - Get program by UUID", func(t *testing.T) {
 		createTestUser(t, suite.svc, "test-user-3-crud@example.com", "password123")
 		loginResp := loginUser(t, suite.testRouter, "test-user-3-crud@example.com", "password123")
-		slug := "test-program-crud-3"
-		createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug)
+		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, "test-program-crud-3", []string{"sports"})
 
-		w := makeRequest("GET", "/api/v1/programs/"+slug, nil, loginResp.AccessToken, suite.testRouter)
-		assert.Equal(t, http.StatusOK, w.Code)
-
-		var program map[string]interface{}
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &program))
-		assert.Equal(t, slug, program["slug"])
-	})
-
-	t.Run("PUT /api/v1/programs/{slug} - Update program", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-4-crud@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-4-crud@example.com", "password123")
-		slug := "test-program-crud-4"
-		createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug)
-
-		updateReq := map[string]interface{}{"title": "Updated Title", "description": "Updated description"}
-		body, _ := json.Marshal(updateReq)
-
-		w := makeRequest("PUT", "/api/v1/programs/"+slug, body, loginResp.AccessToken, suite.testRouter)
-		assert.Equal(t, http.StatusOK, w.Code)
-
-		var program map[string]interface{}
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &program))
-		assert.Equal(t, "Updated Title", program["title"])
-	})
-
-	t.Run("DELETE /api/v1/programs/{slug} - Delete unpublished program", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-5-crud@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-5-crud@example.com", "password123")
-		slug := "test-program-crud-5-delete"
-		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug)
 		programID := program["id"].(string)
 
-		w := makeRequest("DELETE", "/api/v1/programs/"+slug, nil, loginResp.AccessToken, suite.testRouter)
+		w := makeRequest("GET", "/api/v1/programs/"+programID, nil, loginResp.AccessToken, suite.testRouter)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		assert.Equal(t, "test-program-crud-3", response["slug"])
+		assert.NotEmpty(t, response["created_by"])
+	})
+
+	t.Run("PUT /api/v1/programs/{id} - Update program", func(t *testing.T) {
+		createTestUser(t, suite.svc, "test-user-4-crud@example.com", "password123")
+		loginResp := loginUser(t, suite.testRouter, "test-user-4-crud@example.com", "password123")
+		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, "test-program-crud-4", []string{"music"})
+		programID := program["id"].(string)
+
+		updateReq := map[string]interface{}{"title": "Updated Title", "description": "Updated description", "tags": []string{"music", "jazz"}}
+		body, _ := json.Marshal(updateReq)
+
+		w := makeRequest("PUT", "/api/v1/programs/"+programID, body, loginResp.AccessToken, suite.testRouter)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var updatedProgram map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &updatedProgram))
+		assert.Equal(t, "Updated Title", updatedProgram["title"])
+	})
+
+	t.Run("DELETE /api/v1/programs/{id} - Delete unpublished program", func(t *testing.T) {
+		createTestUser(t, suite.svc, "test-user-6-crud@example.com", "password123")
+		loginResp := loginUser(t, suite.testRouter, "test-user-6-crud@example.com", "password123")
+		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, "test-program-crud-6-delete", []string{"health"})
+		programID := program["id"].(string)
+
+		w := makeRequest("DELETE", "/api/v1/programs/"+programID, nil, loginResp.AccessToken, suite.testRouter)
 		assert.Equal(t, http.StatusNoContent, w.Code)
 
 		var eventCount int
@@ -344,16 +338,15 @@ func TestProgramCRUD(t *testing.T) {
 		assert.Equal(t, 0, eventCount)
 	})
 
-	t.Run("DELETE /api/v1/programs/{slug} - Delete published program", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-6-crud@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-6-crud@example.com", "password123")
-		slug := "test-program-crud-6-delete-published"
-		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug)
+	t.Run("DELETE /api/v1/programs/{id} - Delete published program", func(t *testing.T) {
+		createTestUser(t, suite.svc, "test-user-7-crud@example.com", "password123")
+		loginResp := loginUser(t, suite.testRouter, "test-user-7-crud@example.com", "password123")
+		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, "test-program-crud-7-delete-published", []string{"nature"})
 		programID := program["id"].(string)
 
-		makeRequest("POST", "/api/v1/programs/"+slug+"/publish", nil, loginResp.AccessToken, suite.testRouter)
+		makeRequest("POST", "/api/v1/programs/"+programID+"/publish", nil, loginResp.AccessToken, suite.testRouter)
 
-		w := makeRequest("DELETE", "/api/v1/programs/"+slug, nil, loginResp.AccessToken, suite.testRouter)
+		w := makeRequest("DELETE", "/api/v1/programs/"+programID, nil, loginResp.AccessToken, suite.testRouter)
 		assert.Equal(t, http.StatusNoContent, w.Code)
 
 		var eventCount int
@@ -369,14 +362,13 @@ func TestProgramPublishing(t *testing.T) {
 	}
 	defer suite.cleanupFunc()
 
-	t.Run("POST /api/v1/programs/{slug}/publish - Publish program", func(t *testing.T) {
+	t.Run("PATCH /api/v1/programs/{id}/publish - Publish program", func(t *testing.T) {
 		createTestUser(t, suite.svc, "test-user-1-publish@example.com", "password123")
 		loginResp := loginUser(t, suite.testRouter, "test-user-1-publish@example.com", "password123")
-		slug := "test-program-publish-1"
-		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug)
+		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, "test-program-publish-1", []string{"business"})
 		programID := program["id"].(string)
 
-		w := makeRequest("POST", "/api/v1/programs/"+slug+"/publish", nil, loginResp.AccessToken, suite.testRouter)
+		w := makeRequest("POST", "/api/v1/programs/"+programID+"/publish", nil, loginResp.AccessToken, suite.testRouter)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var publishedProgram map[string]interface{}
@@ -388,19 +380,18 @@ func TestProgramPublishing(t *testing.T) {
 		assert.Greater(t, eventCount, 0)
 	})
 
-	t.Run("POST /api/v1/programs/{slug}/publish - Republish", func(t *testing.T) {
+	t.Run("PATCH /api/v1/programs/{id}/publish - Republish", func(t *testing.T) {
 		createTestUser(t, suite.svc, "test-user-2-publish@example.com", "password123")
 		loginResp := loginUser(t, suite.testRouter, "test-user-2-publish@example.com", "password123")
-		slug := "test-program-publish-2"
-		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug)
+		program := createTestProgram(t, suite.testRouter, loginResp.AccessToken, "test-program-publish-2", []string{"finance"})
 		programID := program["id"].(string)
 
-		makeRequest("POST", "/api/v1/programs/"+slug+"/publish", nil, loginResp.AccessToken, suite.testRouter)
+		makeRequest("POST", "/api/v1/programs/"+programID+"/publish", nil, loginResp.AccessToken, suite.testRouter)
 
 		var eventCountFirst int
 		suite.pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM outbox_events WHERE type = 'program.upsert' AND program_id = $1", programID).Scan(&eventCountFirst)
 
-		makeRequest("POST", "/api/v1/programs/"+slug+"/publish", nil, loginResp.AccessToken, suite.testRouter)
+		makeRequest("POST", "/api/v1/programs/"+programID+"/publish", nil, loginResp.AccessToken, suite.testRouter)
 
 		var eventCountSecond int
 		suite.pool.QueryRow(context.Background(), "SELECT COUNT(*) FROM outbox_events WHERE type = 'program.upsert' AND program_id = $1", programID).Scan(&eventCountSecond)
@@ -409,227 +400,78 @@ func TestProgramPublishing(t *testing.T) {
 	})
 }
 
-func TestCategoryEndpoints(t *testing.T) {
+func TestProgramPagination(t *testing.T) {
 	suite := setupTestSuite(t)
 	if suite == nil {
 		return
 	}
 	defer suite.cleanupFunc()
 
-	t.Run("POST /api/v1/categories - Create category", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-1-category@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-1-category@example.com", "password123")
+	t.Run("GET /api/v1/programs?page=1&limit=5 - Paginated list", func(t *testing.T) {
+		createTestUser(t, suite.svc, "test-user-1-pagination@example.com", "password123")
+		loginResp := loginUser(t, suite.testRouter, "test-user-1-pagination@example.com", "password123")
 
-		category := createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-1", "Test category description")
+		for i := 0; i < 10; i++ {
+			createTestProgram(t, suite.testRouter, loginResp.AccessToken, "test-program-pagination-"+strconv.Itoa(i), []string{"test"})
+		}
 
-		assert.Equal(t, "test-category-1", category["Name"])
-		assert.NotNil(t, category["ID"])
-	})
-
-	t.Run("GET /api/v1/categories - List categories", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-2-category@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-2-category@example.com", "password123")
-
-		createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-2-a", "Category A")
-		createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-2-b", "Category B")
-
-		w := makeRequest("GET", "/api/v1/categories", nil, loginResp.AccessToken, suite.testRouter)
+		w := makeRequest("GET", "/api/v1/programs?page=1&limit=5", nil, loginResp.AccessToken, suite.testRouter)
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var categories []map[string]interface{}
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &categories))
-		assert.GreaterOrEqual(t, len(categories), 2)
-	})
+		var response map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		data, ok := response["data"].([]interface{})
+		assert.True(t, ok)
+		assert.LessOrEqual(t, len(data), 5)
 
-	t.Run("GET /api/v1/categories/{id} - Get category by ID", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-3-category@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-3-category@example.com", "password123")
-
-		category := createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-3", "Test category 3")
-		categoryID := category["ID"].(string)
-
-		w := makeRequest("GET", "/api/v1/categories/"+categoryID, nil, loginResp.AccessToken, suite.testRouter)
-		assert.Equal(t, http.StatusOK, w.Code)
-
-		var fetchedCategory map[string]interface{}
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &fetchedCategory))
-		assert.Equal(t, "test-category-3", fetchedCategory["Name"])
+		meta := response["meta"].(map[string]interface{})
+		assert.Equal(t, float64(1), meta["page"])
+		assert.Equal(t, float64(5), meta["limit"])
 	})
 }
 
-func TestProgramCategoryAssignment(t *testing.T) {
+func TestBulkOperations(t *testing.T) {
 	suite := setupTestSuite(t)
 	if suite == nil {
 		return
 	}
 	defer suite.cleanupFunc()
 
-	t.Run("PUT /api/v1/programs/{slug}/categories - Assign categories", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-1-assign@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-1-assign@example.com", "password123")
+	t.Run("POST /api/v1/programs/bulk - Bulk create programs", func(t *testing.T) {
+		createTestUser(t, suite.svc, "test-user-1-bulk@example.com", "password123")
+		loginResp := loginUser(t, suite.testRouter, "test-user-1-bulk@example.com", "password123")
 
-		category1 := createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-assign-1", "Category 1")
-		category2 := createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-assign-2", "Category 2")
-
-		slug := "test-program-assign-1"
-		createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug)
-
-		assignReq := handler.AssignCategoriesRequest{
-			CategoryIDs: []string{category1["ID"].(string), category2["ID"].(string)},
-		}
-		body, _ := json.Marshal(assignReq)
-
-		w := makeRequest("PUT", "/api/v1/programs/"+slug+"/categories", body, loginResp.AccessToken, suite.testRouter)
-		assert.Equal(t, http.StatusNoContent, w.Code)
-	})
-
-	t.Run("GET /api/v1/programs/{slug}/categories - Get assigned categories", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-2-assign@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-2-assign@example.com", "password123")
-
-		category1 := createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-assign-3", "Category 3")
-		category2 := createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-assign-4", "Category 4")
-
-		slug := "test-program-assign-2"
-		createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug)
-
-		assignReq := handler.AssignCategoriesRequest{
-			CategoryIDs: []string{category1["ID"].(string), category2["ID"].(string)},
-		}
-		body, _ := json.Marshal(assignReq)
-		makeRequest("PUT", "/api/v1/programs/"+slug+"/categories", body, loginResp.AccessToken, suite.testRouter)
-
-		w := makeRequest("GET", "/api/v1/programs/"+slug+"/categories", nil, loginResp.AccessToken, suite.testRouter)
-		assert.Equal(t, http.StatusOK, w.Code)
-
-		var categories []map[string]interface{}
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &categories))
-		assert.Equal(t, 2, len(categories))
-	})
-
-	t.Run("PUT /api/v1/programs/{slug}/categories - Update categories", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-3-assign@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-3-assign@example.com", "password123")
-
-		category1 := createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-assign-5", "Category 5")
-		category2 := createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-assign-6", "Category 6")
-		category3 := createTestCategory(t, suite.testRouter, loginResp.AccessToken, "test-category-assign-7", "Category 7")
-
-		slug := "test-program-assign-3"
-		createTestProgram(t, suite.testRouter, loginResp.AccessToken, slug)
-
-		assignReq1 := handler.AssignCategoriesRequest{
-			CategoryIDs: []string{category1["ID"].(string), category2["ID"].(string)},
-		}
-		body1, _ := json.Marshal(assignReq1)
-		makeRequest("PUT", "/api/v1/programs/"+slug+"/categories", body1, loginResp.AccessToken, suite.testRouter)
-
-		assignReq2 := handler.AssignCategoriesRequest{
-			CategoryIDs: []string{category3["ID"].(string)},
-		}
-		body2, _ := json.Marshal(assignReq2)
-		makeRequest("PUT", "/api/v1/programs/"+slug+"/categories", body2, loginResp.AccessToken, suite.testRouter)
-
-		w := makeRequest("GET", "/api/v1/programs/"+slug+"/categories", nil, loginResp.AccessToken, suite.testRouter)
-
-		var categories []map[string]interface{}
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &categories))
-		assert.Equal(t, 3, len(categories))
-	})
-}
-
-func TestImportEndpoint(t *testing.T) {
-	suite := setupTestSuite(t)
-	if suite == nil {
-		return
-	}
-	defer suite.cleanupFunc()
-
-	t.Run("POST /api/v1/import - Import program with valid source", func(t *testing.T) {
-		userID := createTestUser(t, suite.svc, "test-user-1-import@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-1-import@example.com", "password123")
-
-		metadata := map[string]interface{}{"name": "Test YouTube Source"}
-		metadataBytes, _ := json.Marshal(metadata)
-		source, err := suite.sourceRepo.Create(context.Background(), sqlc.CreateSourceParams{
-			Type:     "youtube",
-			Metadata: metadataBytes,
-		})
-		require.NoError(t, err)
-
-		importReq := handler.ImportRequest{
-			SourceType: "youtube",
-			Metadata: map[string]interface{}{
-				"slug":         fmt.Sprintf("test-import-%s", userID[:8]),
-				"title":        "Imported Program",
-				"description":  "A program imported from YouTube",
-				"type":         "podcast",
-				"language":     "en",
-				"duration_ms":  3600000,
-				"source_id":    source.ID,
-				"external_id":  "yt-12345",
-				"external_url": "https://youtube.com/watch?v=12345",
+		bulkReq := map[string]interface{}{
+			"programs": []map[string]interface{}{
+				{
+					"slug":        "bulk-program-1",
+					"title":       "Bulk Program 1",
+					"description": "First bulk program",
+					"type":        "podcast",
+					"language":    "en",
+					"duration_ms": 3600000,
+					"tags":        []string{"news"},
+				},
+				{
+					"slug":        "bulk-program-2",
+					"title":       "Bulk Program 2",
+					"description": "Second bulk program",
+					"type":        "podcast",
+					"language":    "en",
+					"duration_ms": 3600000,
+					"tags":        []string{"sports"},
+				},
 			},
 		}
-		body, _ := json.Marshal(importReq)
+		body, _ := json.Marshal(bulkReq)
 
-		w := makeRequest("POST", "/api/v1/import", body, loginResp.AccessToken, suite.testRouter)
-		assert.Equal(t, http.StatusCreated, w.Code)
+		w := makeRequest("POST", "/api/v1/programs/bulk", body, loginResp.AccessToken, suite.testRouter)
+		assert.Equal(t, http.StatusMultiStatus, w.Code)
 
-		var program map[string]interface{}
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &program))
-		assert.Equal(t, "Imported Program", program["title"])
-		assert.NotEmpty(t, program["id"])
+		var response map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+		created := response["created"].([]interface{})
+		assert.Equal(t, 2, len(created))
 	})
 
-	t.Run("POST /api/v1/import - Invalid source type", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-2-import@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-2-import@example.com", "password123")
-
-		importReq := handler.ImportRequest{
-			SourceType: "invalid_source",
-			Metadata: map[string]interface{}{
-				"slug":        "test-import-invalid",
-				"title":       "Invalid Source Program",
-				"description": "A program with invalid source type",
-				"type":        "podcast",
-				"language":    "en",
-				"duration_ms": 3600000,
-			},
-		}
-		body, _ := json.Marshal(importReq)
-
-		w := makeRequest("POST", "/api/v1/import", body, loginResp.AccessToken, suite.testRouter)
-		assert.NotEqual(t, http.StatusCreated, w.Code)
-	})
-
-	t.Run("POST /api/v1/import - Verify imported program in DB", func(t *testing.T) {
-		createTestUser(t, suite.svc, "test-user-3-import@example.com", "password123")
-		loginResp := loginUser(t, suite.testRouter, "test-user-3-import@example.com", "password123")
-
-		importReq := handler.ImportRequest{
-			SourceType: "youtube",
-			Metadata: map[string]interface{}{
-				"title":        "Imported YouTube Program",
-				"description":  "A program imported from YouTube",
-				"type":         "podcast",
-				"language":     "en",
-				"duration_ms":  1800000,
-				"external_id":  "yt-67890",
-				"external_url": "https://youtube.com/watch?v=67890",
-			},
-		}
-		body, _ := json.Marshal(importReq)
-
-		w := makeRequest("POST", "/api/v1/import", body, loginResp.AccessToken, suite.testRouter)
-		assert.Equal(t, http.StatusCreated, w.Code)
-
-		var program map[string]interface{}
-		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &program))
-
-		slug := program["slug"].(string)
-		dbProgram, err := suite.svc.GetProgramBySlug(context.Background(), slug)
-		require.NoError(t, err)
-		assert.Equal(t, "Imported YouTube Program", dbProgram.Title)
-	})
 }

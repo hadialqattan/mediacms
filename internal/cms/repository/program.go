@@ -49,17 +49,11 @@ func (r *programRepo) GetByID(ctx context.Context, id string) (*domain.Program, 
 	return r.domainProgram(program), nil
 }
 
-func (r *programRepo) GetBySlug(ctx context.Context, slug string) (*domain.Program, error) {
-	program, err := r.queries.GetProgramBySlug(ctx, slug)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.domainProgram(program), nil
-}
-
-func (r *programRepo) List(ctx context.Context) ([]*domain.Program, error) {
-	programs, err := r.queries.ListPrograms(ctx)
+func (r *programRepo) List(ctx context.Context, limit, offset int) ([]*domain.Program, error) {
+	programs, err := r.queries.ListPrograms(ctx, sqlc.ListProgramsParams{
+		Limit:  int32(limit),
+		Offset: int32(offset),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +61,6 @@ func (r *programRepo) List(ctx context.Context) ([]*domain.Program, error) {
 	result := make([]*domain.Program, len(programs))
 	for i, p := range programs {
 		result[i] = r.domainProgram(p)
-
 	}
 	return result, nil
 }
@@ -100,36 +93,6 @@ func (r *programRepo) Delete(ctx context.Context, id, deletedBy string) error {
 	})
 }
 
-func (r *programRepo) AssignCategories(ctx context.Context, programID string, categoryIDs []string) error {
-	uuids := make([]pgtype.UUID, len(categoryIDs))
-	for i, id := range categoryIDs {
-		uuids[i] = pgtype.UUID{Bytes: uuid.MustParse(id), Valid: true}
-	}
-
-	return r.queries.AssignCategories(ctx, sqlc.AssignCategoriesParams{
-		ProgramID: pgtype.UUID{Bytes: uuid.MustParse(programID), Valid: true},
-		Column2:   uuids,
-	})
-}
-
-func (r *programRepo) GetCategories(ctx context.Context, programID string) ([]domain.Category, error) {
-	categories, err := r.queries.GetProgramCategories(ctx, pgtype.UUID{Bytes: uuid.MustParse(programID), Valid: true})
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]domain.Category, len(categories))
-	for i, c := range categories {
-		result[i] = domain.Category{
-			ID:          uuid.UUID(c.ID.Bytes).String(),
-			Name:        c.Name,
-			Description: c.Description.String,
-		}
-	}
-
-	return result, nil
-}
-
 func (r *programRepo) domainProgram(p sqlc.Program) *domain.Program {
 	program := &domain.Program{
 		ID:          uuid.UUID(p.ID.Bytes).String(),
@@ -139,6 +102,7 @@ func (r *programRepo) domainProgram(p sqlc.Program) *domain.Program {
 		Type:        domain.ProgramType(p.Type),
 		Language:    domain.ProgramLanguage(p.Language),
 		DurationMs:  int(p.DurationMs),
+		Tags:        p.Tags,
 		CreatedAt:   p.CreatedAt.Time,
 		CreatedBy:   uuid.UUID(p.CreatedBy.Bytes).String(),
 	}
@@ -155,10 +119,6 @@ func (r *programRepo) domainProgram(p sqlc.Program) *domain.Program {
 		program.DeletedAt = &p.DeletedAt.Time
 		deletedBy := uuid.UUID(p.DeletedBy.Bytes).String()
 		program.DeletedBy = &deletedBy
-	}
-	if p.SourceID.Valid {
-		sourceID := uuid.UUID(p.SourceID.Bytes).String()
-		program.SourceID = &sourceID
 	}
 	if p.UpdatedBy.Valid {
 		updatedBy := uuid.UUID(p.UpdatedBy.Bytes).String()

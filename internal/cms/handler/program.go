@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -21,17 +22,8 @@ func NewProgramHandler(svc *service.Service) *ProgramHandler {
 	return &ProgramHandler{svc: svc}
 }
 
-type CreateProgramRequest struct {
-	Slug        string `json:"slug"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Type        string `json:"type"`
-	Language    string `json:"language"`
-	DurationMs  int    `json:"duration_ms"`
-}
-
 func (h *ProgramHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req CreateProgramRequest
+	var req sqlc.CreateProgramParams
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
@@ -47,17 +39,9 @@ func (h *ProgramHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	createdByID := uuid.MustParse(middleware.GetUserID(r))
-	program, err := h.svc.CreateProgram(r.Context(), sqlc.CreateProgramParams{
-		Slug:        req.Slug,
-		Title:       req.Title,
-		Description: pgtype.Text{String: req.Description, Valid: req.Description != ""},
-		Type:        req.Type,
-		Language:    req.Language,
-		DurationMs:  int32(req.DurationMs),
-		SourceID:    pgtype.UUID{},
-		CreatedBy:   pgtype.UUID{Bytes: createdByID, Valid: true},
-	})
+	req.CreatedBy = pgtype.UUID{Bytes: uuid.MustParse(middleware.GetUserID(r)), Valid: true}
+	program, err := h.svc.CreateProgram(r.Context(), req)
+
 	if err != nil {
 		http.Error(w, "Failed to create program", http.StatusInternalServerError)
 		return
@@ -69,8 +53,8 @@ func (h *ProgramHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProgramHandler) Get(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
-	program, err := h.svc.GetProgramBySlug(r.Context(), slug)
+	id := r.PathValue("id")
+	program, err := h.svc.GetProgram(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Program not found", http.StatusNotFound)
 		return
@@ -80,27 +64,59 @@ func (h *ProgramHandler) Get(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(program)
 }
 
+type ListProgramsResponse struct {
+	Data []*domain.Program `json:"data"`
+	Meta PaginationMeta    `json:"meta"`
+}
+
+type PaginationMeta struct {
+	Page  int `json:"page"`
+	Limit int `json:"limit"`
+}
+
 func (h *ProgramHandler) List(w http.ResponseWriter, r *http.Request) {
-	programs, err := h.svc.ListPrograms(r.Context())
+	page := 1
+	limit := 20
+
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	programs, err := h.svc.ListPrograms(r.Context(), limit, (page-1)*limit)
 	if err != nil {
 		http.Error(w, "Failed to list programs", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(programs)
+	json.NewEncoder(w).Encode(ListProgramsResponse{
+		Data: programs,
+		Meta: PaginationMeta{
+			Page:  page,
+			Limit: limit,
+		},
+	})
 }
 
 type UpdateProgramRequest struct {
-	Title       *string `json:"title"`
-	Description *string `json:"description"`
-	Type        *string `json:"type"`
-	Language    *string `json:"language"`
-	DurationMs  *int    `json:"duration_ms"`
+	Title       *string   `json:"title"`
+	Description *string   `json:"description"`
+	Type        *string   `json:"type"`
+	Language    *string   `json:"language"`
+	DurationMs  *int      `json:"duration_ms"`
+	Tags        *[]string `json:"tags"`
 }
 
 func (h *ProgramHandler) Update(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
+	id := r.PathValue("id")
 
 	var req UpdateProgramRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -118,7 +134,7 @@ func (h *ProgramHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	program, err := h.svc.GetProgramBySlug(r.Context(), slug)
+	program, err := h.svc.GetProgram(r.Context(), id)
 	if err != nil {
 		http.Error(w, "Program not found", http.StatusNotFound)
 		return
@@ -129,6 +145,7 @@ func (h *ProgramHandler) Update(w http.ResponseWriter, r *http.Request) {
 	progType := string(program.Type)
 	language := string(program.Language)
 	durationMs := int32(program.DurationMs)
+	tags := program.Tags
 
 	if req.Title != nil {
 		title = *req.Title
@@ -145,6 +162,9 @@ func (h *ProgramHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.DurationMs != nil {
 		durationMs = int32(*req.DurationMs)
 	}
+	if req.Tags != nil {
+		tags = *req.Tags
+	}
 
 	updatedByID := uuid.MustParse(middleware.GetUserID(r))
 	updateParams := sqlc.UpdateProgramParams{
@@ -154,6 +174,7 @@ func (h *ProgramHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Type:        progType,
 		Language:    language,
 		DurationMs:  durationMs,
+		Tags:        tags,
 		UpdatedBy:   pgtype.UUID{Bytes: updatedByID, Valid: true},
 	}
 
@@ -168,9 +189,9 @@ func (h *ProgramHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProgramHandler) Publish(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
+	id := r.PathValue("id")
 
-	program, err := h.svc.PublishProgramBySlug(r.Context(), slug, middleware.GetUserID(r))
+	program, err := h.svc.PublishProgram(r.Context(), id, middleware.GetUserID(r))
 	if err != nil {
 		http.Error(w, "Failed to publish program", http.StatusInternalServerError)
 		return
@@ -181,9 +202,9 @@ func (h *ProgramHandler) Publish(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProgramHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
+	id := r.PathValue("id")
 
-	if err := h.svc.DeleteProgramBySlug(r.Context(), slug, middleware.GetUserID(r)); err != nil {
+	if err := h.svc.DeleteProgram(r.Context(), id, middleware.GetUserID(r)); err != nil {
 		http.Error(w, "Failed to delete program", http.StatusInternalServerError)
 		return
 	}
@@ -191,36 +212,55 @@ func (h *ProgramHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-type AssignCategoriesRequest struct {
-	CategoryIDs []string `json:"category_ids"`
+type BulkCreateRequest struct {
+	Programs []sqlc.CreateProgramParams `json:"programs"`
 }
 
-func (h *ProgramHandler) AssignCategories(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
+type BulkCreateResponse struct {
+	Created []*domain.Program                  `json:"created"`
+	Failed  []service.BulkCreateProgramFailure `json:"failed"`
+}
 
-	var req AssignCategoriesRequest
+func (h *ProgramHandler) BulkCreate(w http.ResponseWriter, r *http.Request) {
+	var req BulkCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	if err := h.svc.AssignCategoriesBySlug(r.Context(), slug, req.CategoryIDs); err != nil {
-		http.Error(w, "Failed to assign categories", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (h *ProgramHandler) GetCategories(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("id")
-
-	categories, err := h.svc.GetProgramCategoriesBySlug(r.Context(), slug)
-	if err != nil {
-		http.Error(w, "Failed to get categories", http.StatusInternalServerError)
-		return
-	}
+	createdByID := uuid.MustParse(middleware.GetUserID(r))
+	programs, failures := h.svc.BulkCreatePrograms(r.Context(), req.Programs, createdByID.String())
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(categories)
+	w.WriteHeader(http.StatusMultiStatus)
+	json.NewEncoder(w).Encode(BulkCreateResponse{
+		Created: programs,
+		Failed:  failures,
+	})
+}
+
+type BulkDeleteRequest struct {
+	IDs []string `json:"ids"`
+}
+
+type BulkDeleteResponse struct {
+	Deleted []string                           `json:"deleted"`
+	Failed  []service.BulkDeleteProgramFailure `json:"failed"`
+}
+
+func (h *ProgramHandler) BulkDelete(w http.ResponseWriter, r *http.Request) {
+	var req BulkDeleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	deletedIDs, failures := h.svc.BulkDeletePrograms(r.Context(), req.IDs, middleware.GetUserID(r))
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusMultiStatus)
+	json.NewEncoder(w).Encode(BulkDeleteResponse{
+		Deleted: deletedIDs,
+		Failed:  failures,
+	})
 }

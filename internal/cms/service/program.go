@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -20,25 +21,17 @@ func (s *Service) GetProgram(ctx context.Context, id string) (*domain.Program, e
 	return s.programRepo.GetByID(ctx, id)
 }
 
-func (s *Service) GetProgramBySlug(ctx context.Context, slug string) (*domain.Program, error) {
-	return s.programRepo.GetBySlug(ctx, slug)
-}
-
-func (s *Service) ListPrograms(ctx context.Context) ([]*domain.Program, error) {
-	return s.programRepo.List(ctx)
-}
-
-func (s *Service) UpdateProgram(ctx context.Context, id string, params sqlc.UpdateProgramParams) (*domain.Program, error) {
-	return s.programRepo.Update(ctx, id, params)
-}
-
-func (s *Service) UpdateProgramBySlug(ctx context.Context, slug string, params sqlc.UpdateProgramParams) (*domain.Program, error) {
-	program, err := s.programRepo.GetBySlug(ctx, slug)
+func (s *Service) ListPrograms(ctx context.Context, limit, offset int) ([]*domain.Program, error) {
+	programs, err := s.programRepo.List(ctx, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.programRepo.Update(ctx, program.ID, params)
+	return programs, nil
+}
+
+func (s *Service) UpdateProgram(ctx context.Context, id string, params sqlc.UpdateProgramParams) (*domain.Program, error) {
+	return s.programRepo.Update(ctx, id, params)
 }
 
 func (s *Service) PublishProgram(ctx context.Context, id, userID string) (*domain.Program, error) {
@@ -62,15 +55,6 @@ func (s *Service) PublishProgram(ctx context.Context, id, userID string) (*domai
 	}
 
 	return program, nil
-}
-
-func (s *Service) PublishProgramBySlug(ctx context.Context, slug, userID string) (*domain.Program, error) {
-	program, err := s.programRepo.GetBySlug(ctx, slug)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.PublishProgram(ctx, program.ID, userID)
 }
 
 func (s *Service) DeleteProgram(ctx context.Context, id, userID string) error {
@@ -101,71 +85,150 @@ func (s *Service) DeleteProgram(ctx context.Context, id, userID string) error {
 	return nil
 }
 
-func (s *Service) DeleteProgramBySlug(ctx context.Context, slug, userID string) error {
-	program, err := s.programRepo.GetBySlug(ctx, slug)
-	if err != nil {
-		return err
-	}
-
-	return s.DeleteProgram(ctx, program.ID, userID)
+type BulkCreateProgramFailure struct {
+	Index int    `json:"index"`
+	Error string `json:"error"`
 }
 
-func (s *Service) AssignCategories(ctx context.Context, programID string, categoryIDs []string) error {
+func (s *Service) BulkCreatePrograms(ctx context.Context, programs []sqlc.CreateProgramParams, createdBy string) ([]*domain.Program, []BulkCreateProgramFailure) {
+	var created []*domain.Program
+	var failures []BulkCreateProgramFailure
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return err
+		for i := range programs {
+			failures = append(failures, BulkCreateProgramFailure{
+				Index: i,
+				Error: "failed to begin transaction",
+			})
+		}
+		return nil, failures
 	}
 	defer tx.Rollback(ctx)
 
-	if err := s.programRepo.WithTx(tx).AssignCategories(ctx, programID, categoryIDs); err != nil {
-		return err
-	}
-	program, err := s.programRepo.WithTx(tx).GetByID(ctx, programID)
-	if err != nil {
-		return err
-	}
-	if program.IsPublished() {
-		if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramUpsert, program); err != nil {
-			return err
+	for i, prog := range programs {
+		if !domain.IsValidProgramType(prog.Type) {
+			failures = append(failures, BulkCreateProgramFailure{
+				Index: i,
+				Error: "invalid type: must be 'podcast' or 'documentary'",
+			})
+			continue
 		}
+
+		if !domain.IsValidProgramLanguage(prog.Language) {
+			failures = append(failures, BulkCreateProgramFailure{
+				Index: i,
+				Error: "invalid language: must be 'ar' or 'en'",
+			})
+			continue
+		}
+
+		tags := prog.Tags
+		if tags == nil {
+			tags = []string{}
+		}
+
+		program, err := s.programRepo.WithTx(tx).Create(ctx, sqlc.CreateProgramParams{
+			Slug:        prog.Slug,
+			Title:       prog.Title,
+			Description: prog.Description,
+			Type:        prog.Type,
+			Language:    prog.Language,
+			DurationMs:  int32(prog.DurationMs),
+			Tags:        tags,
+			CreatedBy:   pgtype.UUID{Bytes: uuid.MustParse(createdBy), Valid: true},
+		})
+		if err != nil {
+			failures = append(failures, BulkCreateProgramFailure{
+				Index: i,
+				Error: fmt.Sprintf("failed to create: %v", err),
+			})
+			continue
+		}
+
+		created = append(created, program)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return err
+		return nil, []BulkCreateProgramFailure{{Error: "failed to commit transaction"}}
 	}
 
-	return nil
+	return created, failures
 }
 
-func (s *Service) AssignCategoriesBySlug(ctx context.Context, slug string, categoryIDs []string) error {
-	program, err := s.programRepo.GetBySlug(ctx, slug)
+type BulkDeleteProgramFailure struct {
+	ID    string `json:"id"`
+	Error string `json:"error"`
+}
+
+func (s *Service) BulkDeletePrograms(ctx context.Context, ids []string, deletedBy string) ([]string, []BulkDeleteProgramFailure) {
+	var deleted []string
+	var failures []BulkDeleteProgramFailure
+
+	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return err
+		for _, id := range ids {
+			failures = append(failures, BulkDeleteProgramFailure{
+				ID:    id,
+				Error: "failed to begin transaction",
+			})
+		}
+		return nil, failures
+	}
+	defer tx.Rollback(ctx)
+
+	for _, id := range ids {
+		savepointName := fmt.Sprintf("sp_%s", id)
+		if _, err := tx.Exec(ctx, fmt.Sprintf("SAVEPOINT %s", savepointName)); err != nil {
+			failures = append(failures, BulkDeleteProgramFailure{
+				ID:    id,
+				Error: fmt.Sprintf("failed to create savepoint: %v", err),
+			})
+			continue
+		}
+
+		program, err := s.programRepo.WithTx(tx).GetByID(ctx, id)
+		if err != nil {
+			tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s", savepointName))
+			failures = append(failures, BulkDeleteProgramFailure{
+				ID:    id,
+				Error: "program not found",
+			})
+			continue
+		}
+
+		if err := s.programRepo.WithTx(tx).Delete(ctx, id, deletedBy); err != nil {
+			tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s", savepointName))
+			failures = append(failures, BulkDeleteProgramFailure{
+				ID:    id,
+				Error: fmt.Sprintf("failed to delete: %v", err),
+			})
+			continue
+		}
+
+		if program.IsPublished() {
+			if err := s.emitOutboxEvent(ctx, tx, domain.OutboxEventTypeProgramDelete, program); err != nil {
+				tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s", savepointName))
+				failures = append(failures, BulkDeleteProgramFailure{
+					ID:    id,
+					Error: fmt.Sprintf("failed to emit event: %v", err),
+				})
+				continue
+			}
+		}
+
+		tx.Exec(ctx, fmt.Sprintf("RELEASE SAVEPOINT %s", savepointName))
+		deleted = append(deleted, id)
 	}
 
-	return s.AssignCategories(ctx, program.ID, categoryIDs)
-}
-
-func (s *Service) GetProgramCategories(ctx context.Context, programID string) ([]domain.Category, error) {
-	return s.programRepo.GetCategories(ctx, programID)
-}
-
-func (s *Service) GetProgramCategoriesBySlug(ctx context.Context, slug string) ([]domain.Category, error) {
-	program, err := s.programRepo.GetBySlug(ctx, slug)
-	if err != nil {
-		return nil, err
+	if err := tx.Commit(ctx); err != nil {
+		return nil, []BulkDeleteProgramFailure{{Error: "failed to commit transaction"}}
 	}
 
-	return s.programRepo.GetCategories(ctx, program.ID)
+	return deleted, failures
 }
 
 func (s *Service) emitOutboxEvent(ctx context.Context, tx pgx.Tx, eventType domain.OutboxEventType, program *domain.Program) error {
-	categories, err := s.programRepo.WithTx(tx).GetCategories(ctx, program.ID)
-	if err != nil {
-		return err
-	}
-	program.Categories = categories
-
 	payload, err := json.Marshal(program)
 	if err != nil {
 		return err

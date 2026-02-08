@@ -41,14 +41,12 @@ func main() {
 	defer redisClient.Close()
 
 	programRepo := repository.NewProgramRepo(pool)
-	categoryRepo := repository.NewCategoryRepo(pool)
-	sourceRepo := repository.NewSourceRepo(pool)
 	outboxRepo := repository.NewOutboxRepo(pool)
 	userRepo := repository.NewUserRepo(pool)
 	sessionRepo := repository.NewSessionRepo(redisClient, cfg.JWT)
 	jwtManager := auth.NewJWTManager(cfg.JWT)
 
-	svc := service.NewService(programRepo, categoryRepo, sourceRepo, outboxRepo, userRepo, sessionRepo, jwtManager, pool)
+	svc := service.NewService(programRepo, outboxRepo, userRepo, sessionRepo, jwtManager, pool)
 
 	if err := svc.SeedDefaultAdmin(context.Background(), cfg.DefaultAdmin.Email, cfg.DefaultAdmin.Password); err != nil {
 		log.Fatalf("Failed to seed default admin: %v", err)

@@ -10,9 +10,9 @@ import (
 )
 
 type UserRepo interface {
+	WithTx(tx pgx.Tx) UserRepo
 	Create(ctx context.Context, params sqlc.CreateUserParams) (*domain.User, error)
 	GetByID(ctx context.Context, id string) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	Count(ctx context.Context) (int64, error)
-	WithTx(tx pgx.Tx) UserRepo
 }
