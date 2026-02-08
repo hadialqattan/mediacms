@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg := config.LoadDiscovery()
 
 	typesenseClient := typesense.NewClient(
 		typesense.WithServer(cfg.TypesenseAddress),

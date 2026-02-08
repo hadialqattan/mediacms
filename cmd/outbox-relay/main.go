@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/hadialqattan/mediacms/config"
 	"github.com/hadialqattan/mediacms/internal/outboxrelay"
@@ -15,18 +14,18 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg := config.LoadOutbox()
 
-	pool, err := postgres.NewConnectionPool(context.Background(), cfg.DatabaseURL)
+	pool, err := postgres.NewConnectionPool(context.Background(), cfg.Database)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer pool.Close()
 
 	outboxRepo := repository.NewOutboxRepo(pool)
-	queue := repository.NewQueue(cfg.RedisAddr)
+	queue := repository.NewQueue(cfg.Redis.Addr)
 
-	relay := outboxrelay.NewRelay(outboxRepo, queue, 5*time.Second)
+	relay := outboxrelay.NewRelay(outboxRepo, queue, cfg.Outbox.RelayInterval)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

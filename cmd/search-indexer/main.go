@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg := config.LoadSearchIndexer()
 
 	typesenseClient := typesense.NewClient(
 		typesense.WithServer(cfg.TypesenseAddress),
@@ -24,7 +24,7 @@ func main() {
 	searchIndex := repository.NewSearchIndex(typesenseClient)
 
 	worker := searchindexer.NewWorker(searchIndex)
-	server, mux := searchindexer.NewWorkerAndMux(worker, cfg.RedisAddr)
+	server, mux := searchindexer.NewWorkerAndMux(worker, cfg.Redis.Addr)
 
 	go func() {
 		log.Println("Starting Search Indexer worker...")

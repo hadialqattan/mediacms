@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 
@@ -20,19 +19,19 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg := config.LoadCMS()
 
-	pool, err := postgres.NewConnectionPool(context.Background(), cfg.DatabaseURL)
+	pool, err := postgres.NewConnectionPool(context.Background(), cfg.Database)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer pool.Close()
 
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:            cfg.RedisAddr,
-		MaxRetries:      3,
-		MinRetryBackoff: 500 * time.Millisecond,
-		MaxRetryBackoff: time.Second,
+		Addr:            cfg.Redis.Addr,
+		MaxRetries:      cfg.Redis.MaxRetries,
+		MinRetryBackoff: cfg.Redis.MinRetryBackoff,
+		MaxRetryBackoff: cfg.Redis.MaxRetryBackoff,
 	})
 
 	if err := redisClient.Ping(context.Background()).Err(); err != nil {

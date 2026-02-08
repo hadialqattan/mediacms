@@ -2,18 +2,35 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"time"
 )
 
 type Config struct {
-	ServiceName      string
 	Port             string
-	DatabaseURL      string
-	RedisAddr        string
+	Database         DatabaseConfig
+	Redis            RedisConfig
+	Outbox           OutboxConfig
 	TypesenseAddress string
 	TypesenseAPIKey  string
 	JWT              JWTConfig
 	DefaultAdmin     DefaultAdminConfig
+}
+
+type DatabaseConfig struct {
+	URL            string
+	MaxConnections int
+}
+
+type RedisConfig struct {
+	Addr            string
+	MaxRetries      int
+	MinRetryBackoff time.Duration
+	MaxRetryBackoff time.Duration
+}
+
+type OutboxConfig struct {
+	RelayInterval time.Duration
 }
 
 type JWTConfig struct {
@@ -27,12 +44,38 @@ type DefaultAdminConfig struct {
 	Password string
 }
 
-func Load() *Config {
+func LoadCMS() *Config {
+	return load("8080")
+}
+
+func LoadDiscovery() *Config {
+	return load("8081")
+}
+
+func LoadOutbox() *Config {
+	return load("8082")
+}
+
+func LoadSearchIndexer() *Config {
+	return load("8083")
+}
+
+func load(defaultPort string) *Config {
 	return &Config{
-		ServiceName:      getEnv("SERVICE_NAME", "mediacms-cms"),
-		Port:             getEnv("PORT", "8080"),
-		DatabaseURL:      getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/mediacms?sslmode=disable"),
-		RedisAddr:        getEnv("REDIS_ADDR", "localhost:6379"),
+		Port: getEnv("PORT", defaultPort),
+		Database: DatabaseConfig{
+			URL:            getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/mediacms?sslmode=disable"),
+			MaxConnections: getIntEnv("DB_MAX_CONNECTIONS", 25),
+		},
+		Redis: RedisConfig{
+			Addr:            getEnv("REDIS_ADDR", "localhost:6379"),
+			MaxRetries:      getIntEnv("REDIS_MAX_RETRIES", 3),
+			MinRetryBackoff: getDurationEnv("REDIS_MIN_RETRY_BACKOFF", 500*time.Millisecond),
+			MaxRetryBackoff: getDurationEnv("REDIS_MAX_RETRY_BACKOFF", time.Second),
+		},
+		Outbox: OutboxConfig{
+			RelayInterval: getDurationEnv("OUTBOX_RELAY_INTERVAL", 5*time.Second),
+		},
 		TypesenseAddress: getEnv("TYPESENSE_ADDRESS", "http://localhost:8108"),
 		TypesenseAPIKey:  getEnv("TYPESENSE_API_KEY", "xyz"),
 		JWT: JWTConfig{
@@ -54,6 +97,15 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
+func getIntEnv(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if i, err := strconv.Atoi(value); err == nil {
+			return i
+		}
+	}
+	return defaultValue
+}
+
 func getDurationEnv(key string, defaultValue time.Duration) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		if d, err := time.ParseDuration(value); err == nil {
@@ -61,12 +113,4 @@ func getDurationEnv(key string, defaultValue time.Duration) time.Duration {
 		}
 	}
 	return defaultValue
-}
-
-func (c *Config) GetTypesenseClientConfig() (addr, apiKey string) {
-	return c.TypesenseAddress, c.TypesenseAPIKey
-}
-
-func (c *Config) GetRedisClientConfig() (addr string, retryInterval time.Duration) {
-	return c.RedisAddr, 5 * time.Second
 }
