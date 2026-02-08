@@ -1,6 +1,6 @@
 # MediaCMS
 
-A content management and discovery system for media programs. The system provides separate write and read APIs with asynchronous task processing to keep search indexes in sync.
+A content management and discovery system for media programs.
 
 ## Architecture
 
