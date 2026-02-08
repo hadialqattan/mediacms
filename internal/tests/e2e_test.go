@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/typesense/typesense-go/typesense"
@@ -26,7 +27,7 @@ import (
 	"github.com/hadialqattan/mediacms/internal/cms/repository/sqlc"
 	cmsrouter "github.com/hadialqattan/mediacms/internal/cms/router"
 	cmsservice "github.com/hadialqattan/mediacms/internal/cms/service"
-	cmsdiscovery "github.com/hadialqattan/mediacms/internal/discovery"
+	"github.com/hadialqattan/mediacms/internal/discovery"
 	discoveryrepo "github.com/hadialqattan/mediacms/internal/discovery/repository"
 	discoveryrouter "github.com/hadialqattan/mediacms/internal/discovery/router"
 	"github.com/hadialqattan/mediacms/internal/outboxrelay"
@@ -71,7 +72,6 @@ func TestFullCMSToDiscoveryFlow(t *testing.T) {
 	_, _ = suite.typesenseClient.Collection("programs").Document(programID).Delete(ctx)
 
 	suite.pool.Exec(ctx, "DELETE FROM outbox_events WHERE program_id = $1", programID)
-	suite.pool.Exec(ctx, "DELETE FROM categorized_as WHERE program_id = $1", programID)
 	suite.pool.Exec(ctx, "DELETE FROM programs WHERE id = $1", programID)
 	suite.pool.Exec(ctx, "DELETE FROM users WHERE id = $1", userID)
 
@@ -100,7 +100,6 @@ func setupE2ETest(t *testing.T) *e2eTestSuite {
 	)
 
 	pool.Exec(ctx, "DELETE FROM outbox_events WHERE program_id IN (SELECT id FROM programs WHERE slug LIKE 'test-e2e-%')")
-	pool.Exec(ctx, "DELETE FROM categorized_as WHERE program_id IN (SELECT id FROM programs WHERE slug LIKE 'test-e2e-%')")
 	pool.Exec(ctx, "DELETE FROM programs WHERE slug LIKE 'test-e2e-%'")
 	pool.Exec(ctx, "DELETE FROM users WHERE email LIKE 'e2e-test%@example.com'")
 	redisClient.FlushAll(ctx)
@@ -114,16 +113,15 @@ func setupE2ETest(t *testing.T) *e2eTestSuite {
 			{Name: "description", Type: "string"},
 			{Name: "type", Type: "string"},
 			{Name: "language", Type: "string"},
+			{Name: "tags", Type: "string[]"},
 			{Name: "duration_ms", Type: "int32"},
-			{Name: "categories", Type: "string[]"},
 			{Name: "published_at", Type: "int64"},
+			{Name: "created_at", Type: "int64"},
 		},
 	}
 	_, _ = typesenseClient.Collections().Create(ctx, schema)
 
 	programRepo := cmsrepo.NewProgramRepo(pool)
-	categoryRepo := cmsrepo.NewCategoryRepo(pool)
-	sourceRepo := cmsrepo.NewSourceRepo(pool)
 	cmsOutboxRepo := cmsrepo.NewOutboxRepo(pool)
 	userRepo := cmsrepo.NewUserRepo(pool)
 
@@ -136,11 +134,11 @@ func setupE2ETest(t *testing.T) *e2eTestSuite {
 	sessionRepo := cmsrepo.NewSessionRepo(redisClient, cfg)
 	jwtManager := auth.NewJWTManager(cfg)
 
-	cmsService := cmsservice.NewService(programRepo, categoryRepo, sourceRepo, cmsOutboxRepo, userRepo, sessionRepo, jwtManager, pool)
+	cmsService := cmsservice.NewService(programRepo, cmsOutboxRepo, userRepo, sessionRepo, jwtManager, pool)
 	cmsRouter := cmsrouter.NewRouter(cmsService, cfg)
 
 	searchIndex := discoveryrepo.NewSearchIndex(typesenseClient)
-	discoveryService := cmsdiscovery.NewService(searchIndex)
+	discoveryService := discovery.NewService(searchIndex)
 	discoveryRouter := discoveryrouter.NewRouter(discoveryService)
 
 	asynqClient := outboxrepo.NewQueue("localhost:6379")
@@ -198,13 +196,14 @@ func loginE2EUser(t *testing.T, router http.Handler, email, password string) *ha
 }
 
 func createE2EProgram(t *testing.T, router http.Handler, accessToken, slug string) string {
-	createReq := handler.CreateProgramRequest{
+	createReq := sqlc.CreateProgramParams{
 		Slug:        slug,
 		Title:       "E2E Test Podcast",
-		Description: "A podcast for end-to-end testing",
+		Description: pgtype.Text{String: "A podcast for end-to-end testing", Valid: true},
 		Type:        "podcast",
 		Language:    "en",
 		DurationMs:  3600000,
+		Tags:        []string{"e2e", "test"},
 	}
 	createBody, _ := json.Marshal(createReq)
 	createReqHTTP := httptest.NewRequest("POST", "/api/v1/programs", bytes.NewReader(createBody))
@@ -224,7 +223,7 @@ func createE2EProgram(t *testing.T, router http.Handler, accessToken, slug strin
 }
 
 func publishE2EProgram(t *testing.T, router http.Handler, accessToken, slug, programID string) {
-	publishReqHTTP := httptest.NewRequest("POST", "/api/v1/programs/"+slug+"/publish", nil)
+	publishReqHTTP := httptest.NewRequest("POST", "/api/v1/programs/"+programID+"/publish", nil)
 	publishReqHTTP.Header.Set("Authorization", "Bearer "+accessToken)
 	publishW := httptest.NewRecorder()
 	router.ServeHTTP(publishW, publishReqHTTP)
@@ -271,7 +270,7 @@ func searchAndVerifyProgram(t *testing.T, router http.Handler, programID string)
 	t.Log("Waiting for search indexer to process...")
 	time.Sleep(3 * time.Second)
 
-	searchReq := httptest.NewRequest("GET", "/api/v1/programs/search?q=E2E", nil)
+	searchReq := httptest.NewRequest("GET", "/api/v1/programs?q=E2E", nil)
 	searchW := httptest.NewRecorder()
 	router.ServeHTTP(searchW, searchReq)
 
@@ -281,7 +280,7 @@ func searchAndVerifyProgram(t *testing.T, router http.Handler, programID string)
 
 	var searchResult map[string]interface{}
 	json.Unmarshal(searchW.Body.Bytes(), &searchResult)
-	programs := searchResult["programs"].([]interface{})
+	programs := searchResult["results"].([]interface{})
 
 	if len(programs) == 0 {
 		t.Fatal("Expected to find program in search results")
