@@ -19,10 +19,17 @@ func NewRouter(service *discovery.Service) *chi.Mux {
 	}))
 
 	programHandler := handler.NewProgramHandler(service)
+	healthHandler := handler.NewHealthHandler()
+
+	r.Get("/health", healthHandler.Health)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/programs/search", programHandler.Search)
-		r.Get("/programs/{id}", programHandler.Get)
+		r.Route("/programs", func(r chi.Router) {
+			r.Get("/", programHandler.Search)
+			r.Get("/{id}", programHandler.Get)
+			r.Get("/recent", programHandler.GetRecent)
+			r.Get("/facets", programHandler.GetFacets)
+		})
 	})
 
 	return r

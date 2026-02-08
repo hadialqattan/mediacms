@@ -42,16 +42,15 @@ type Program struct {
 	Type        ProgramType     `json:"type"`
 	Language    ProgramLanguage `json:"language"`
 	DurationMs  int             `json:"duration_ms"`
+	Tags        []string        `json:"tags"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   *time.Time      `json:"updated_at,omitempty"`
 	PublishedAt *time.Time      `json:"published_at,omitempty"`
 	DeletedAt   *time.Time      `json:"deleted_at,omitempty"`
-	SourceID    *string         `json:"source_id,omitempty"`
 	CreatedBy   string          `json:"created_by"`
 	PublishedBy *string         `json:"published_by,omitempty"`
 	UpdatedBy   *string         `json:"updated_by,omitempty"`
 	DeletedBy   *string         `json:"deleted_by,omitempty"`
-	Categories  []Category      `json:"categories"`
 }
 
 func (p *Program) IsPublished() bool {

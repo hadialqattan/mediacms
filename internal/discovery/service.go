@@ -24,3 +24,11 @@ func (s *Service) SearchPrograms(ctx context.Context, params port.SearchParams) 
 func (s *Service) GetProgram(ctx context.Context, id string) (*domain.Program, error) {
 	return s.searchIndex.GetProgram(ctx, id)
 }
+
+func (s *Service) GetRecentPrograms(ctx context.Context, params port.RecentParams) (*port.RecentResult, error) {
+	return s.searchIndex.GetRecentPrograms(ctx, params)
+}
+
+func (s *Service) GetFacets(ctx context.Context) (*port.FacetsResult, error) {
+	return s.searchIndex.GetFacets(ctx)
+}
