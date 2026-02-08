@@ -104,6 +104,7 @@ func setupE2ETest(t *testing.T) *e2eTestSuite {
 	pool.Exec(ctx, "DELETE FROM users WHERE email LIKE 'e2e-test%@example.com'")
 	redisClient.FlushAll(ctx)
 
+	facetTrue := true
 	schema := &api.CollectionSchema{
 		Name: "programs",
 		Fields: []api.Field{
@@ -111,9 +112,9 @@ func setupE2ETest(t *testing.T) *e2eTestSuite {
 			{Name: "slug", Type: "string"},
 			{Name: "title", Type: "string"},
 			{Name: "description", Type: "string"},
-			{Name: "type", Type: "string"},
-			{Name: "language", Type: "string"},
-			{Name: "tags", Type: "string[]"},
+			{Name: "type", Type: "string", Facet: &facetTrue},
+			{Name: "language", Type: "string", Facet: &facetTrue},
+			{Name: "tags", Type: "string[]", Facet: &facetTrue},
 			{Name: "duration_ms", Type: "int32"},
 			{Name: "published_at", Type: "int64"},
 			{Name: "created_at", Type: "int64"},
