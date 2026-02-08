@@ -34,13 +34,14 @@ func setupTestSuite(t *testing.T) *testSuite {
 		t.Skipf("Redis not available: %v", err)
 		return nil
 	}
-	redisClient.FlushAll(ctx)
 
 	typesenseClient := typesense.NewClient(
 		typesense.WithServer("http://localhost:8108"),
 		typesense.WithAPIKey("xyz"),
 	)
 
+	facetTrue := true
+	pubField := "published_at"
 	schema := &api.CollectionSchema{
 		Name: "programs",
 		Fields: []api.Field{
@@ -48,19 +49,24 @@ func setupTestSuite(t *testing.T) *testSuite {
 			{Name: "slug", Type: "string"},
 			{Name: "title", Type: "string"},
 			{Name: "description", Type: "string"},
-			{Name: "type", Type: "string"},
-			{Name: "language", Type: "string"},
+			{Name: "type", Type: "string", Facet: &facetTrue},
+			{Name: "language", Type: "string", Facet: &facetTrue},
+			{Name: "tags", Type: "string[]", Facet: &facetTrue},
 			{Name: "duration_ms", Type: "int32"},
-			{Name: "categories", Type: "string[]"},
 			{Name: "published_at", Type: "int64"},
+			{Name: "created_at", Type: "int64"},
 		},
+		DefaultSortingField: &pubField,
+	}
+	_, err := typesenseClient.Collections().Create(ctx, schema)
+	if err != nil {
+		t.Logf("Warning: Failed to create Typesense collection: %v", err)
 	}
 
-	_, _ = typesenseClient.Collections().Create(ctx, schema)
+	redisClient.FlushAll(ctx)
+	time.Sleep(500 * time.Millisecond)
 
 	asynqClient := asynq.NewClient(asynq.RedisClientOpt{Addr: "localhost:6379"})
-
-	time.Sleep(2 * time.Second)
 
 	return &testSuite{
 		redisClient:     redisClient,
@@ -91,9 +97,44 @@ func createPublishedProgram(slug, title string) domain.Program {
 		Type:        domain.ProgramTypePodcast,
 		Language:    domain.LanguageEn,
 		DurationMs:  3600000,
+		Tags:        []string{"test", "integration"},
+		CreatedAt:   now,
 		CreatedBy:   "test-user",
 		PublishedAt: &now,
 	}
+}
+
+func waitForDocument(t *testing.T, client *typesense.Client, programID string, timeout time.Duration) map[string]interface{} {
+	ctx := context.Background()
+	deadline := time.Now().Add(timeout)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for time.Now().Before(deadline) {
+		doc, err := client.Collection("programs").Document(programID).Retrieve(ctx)
+		if err == nil {
+			return doc
+		}
+		<-ticker.C
+	}
+	t.Fatalf("Timeout waiting for document %s to appear in Typesense", programID)
+	return nil
+}
+
+func waitForDocumentDeletion(t *testing.T, client *typesense.Client, programID string, timeout time.Duration) {
+	ctx := context.Background()
+	deadline := time.Now().Add(timeout)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for time.Now().Before(deadline) {
+		_, err := client.Collection("programs").Document(programID).Retrieve(ctx)
+		if err != nil {
+			return // Document is gone
+		}
+		<-ticker.C
+	}
+	t.Fatalf("Timeout waiting for document %s to be deleted from Typesense", programID)
 }
 
 func TestUpsertPublishedProgram(t *testing.T) {
@@ -103,16 +144,10 @@ func TestUpsertPublishedProgram(t *testing.T) {
 	}
 	defer suite.cleanupFunc()
 
-	suite.redisClient.FlushAll(context.Background())
-
 	program := createPublishedProgram("test-indexer-published", "Test Indexer Published")
-
 	enqueueTask(t, suite.asynqClient, domain.OutboxEventTypeProgramUpsert, program)
 
-	time.Sleep(3 * time.Second)
-
-	doc, err := suite.typesenseClient.Collection("programs").Document(program.ID).Retrieve(context.Background())
-	require.NoError(t, err)
+	doc := waitForDocument(t, suite.typesenseClient, program.ID, 3*time.Second)
 	assert.Equal(t, program.ID, doc["id"])
 	assert.Equal(t, program.Title, doc["title"])
 
@@ -128,24 +163,12 @@ func TestDeleteProgramFromIndex(t *testing.T) {
 	}
 	defer suite.cleanupFunc()
 
-	suite.redisClient.FlushAll(context.Background())
-
 	program := createPublishedProgram("test-indexer-delete", "Test Indexer Delete")
-
 	enqueueTask(t, suite.asynqClient, domain.OutboxEventTypeProgramUpsert, program)
-
-	time.Sleep(3 * time.Second)
-
-	doc, err := suite.typesenseClient.Collection("programs").Document(program.ID).Retrieve(context.Background())
-	require.NoError(t, err)
-	assert.Equal(t, program.ID, doc["id"])
+	waitForDocument(t, suite.typesenseClient, program.ID, 3*time.Second)
 
 	enqueueTask(t, suite.asynqClient, domain.OutboxEventTypeProgramDelete, program)
-
-	time.Sleep(1 * time.Second)
-
-	_, err = suite.typesenseClient.Collection("programs").Document(program.ID).Retrieve(context.Background())
-	assert.Error(t, err)
+	waitForDocumentDeletion(t, suite.typesenseClient, program.ID, 2*time.Second)
 }
 
 func TestDoNotIndexDeletedProgram(t *testing.T) {
@@ -155,16 +178,13 @@ func TestDoNotIndexDeletedProgram(t *testing.T) {
 	}
 	defer suite.cleanupFunc()
 
-	suite.redisClient.FlushAll(context.Background())
-
 	now := time.Now()
 	program := createPublishedProgram("test-indexer-deleted", "Test Indexer Deleted")
 	program.DeletedAt = &now
 
 	enqueueTask(t, suite.asynqClient, domain.OutboxEventTypeProgramUpsert, program)
 
-	time.Sleep(1 * time.Second)
-
+	time.Sleep(500 * time.Millisecond)
 	_, err := suite.typesenseClient.Collection("programs").Document(program.ID).Retrieve(context.Background())
-	assert.Error(t, err)
+	assert.Error(t, err, "Deleted program should not be indexed")
 }
