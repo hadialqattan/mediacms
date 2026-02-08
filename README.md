@@ -164,8 +164,6 @@ Default admin account is created on first startup:
 
 Change these via `DEFAULT_ADMIN_EMAIL` and `DEFAULT_ADMIN_PASSWORD` environment variables.
 
-## Deployment
-
 ### GCP Architecture
 
 | Component      | GCP Service                             | Why                                                      |
