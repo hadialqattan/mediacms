@@ -84,7 +84,7 @@ func createTestProgram(t *testing.T, queries *sqlc.Queries, slug string, userID 
 		Type:        "podcast",
 		Language:    "en",
 		DurationMs:  3600000,
-		SourceID:    pgtype.UUID{},
+		Tags:        []string{"test"},
 		CreatedBy:   userID,
 	})
 	require.NoError(t, err)
@@ -136,6 +136,7 @@ func TestBasicRelayFlow(t *testing.T) {
 	user := createTestUser(t, suite.cmsQueries, "test-relay-user@example.com")
 	program := createTestProgram(t, suite.cmsQueries, "test-relay-basic", user.ID)
 	event := createTestOutboxEvent(t, suite.cmsQueries, program.ID, "test-relay-basic")
+	eventID := event.ID.String()
 
 	relayCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -144,7 +145,7 @@ func TestBasicRelayFlow(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	var enqueued bool
-	err := suite.pool.QueryRow(context.Background(), "SELECT enqueued FROM outbox_events WHERE id = $1", pgtypeUUID(event.ID.Bytes)).Scan(&enqueued)
+	err := suite.pool.QueryRow(context.Background(), "SELECT enqueued FROM outbox_events WHERE id = $1", eventID).Scan(&enqueued)
 	require.NoError(t, err)
 	assert.True(t, enqueued)
 }
@@ -194,8 +195,9 @@ func TestIdempotency(t *testing.T) {
 	user := createTestUser(t, suite.cmsQueries, "test-relay-idempotent-user@example.com")
 	program := createTestProgram(t, suite.cmsQueries, "test-relay-idempotent", user.ID)
 	event := createTestOutboxEvent(t, suite.cmsQueries, program.ID, "test-relay-idempotent")
+	eventID := event.ID.String()
 
-	_, err := suite.pool.Exec(context.Background(), "UPDATE outbox_events SET enqueued = true WHERE id = $1", pgtypeUUID(event.ID.Bytes))
+	_, err := suite.pool.Exec(context.Background(), "UPDATE outbox_events SET enqueued = true WHERE id = $1", eventID)
 	require.NoError(t, err)
 
 	relayCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -205,7 +207,7 @@ func TestIdempotency(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 
 	var enqueued bool
-	err = suite.pool.QueryRow(context.Background(), "SELECT enqueued FROM outbox_events WHERE id = $1", pgtypeUUID(event.ID.Bytes)).Scan(&enqueued)
+	err = suite.pool.QueryRow(context.Background(), "SELECT enqueued FROM outbox_events WHERE id = $1", eventID).Scan(&enqueued)
 	require.NoError(t, err)
 	assert.True(t, enqueued)
 }
