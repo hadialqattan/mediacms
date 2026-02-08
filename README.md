@@ -163,3 +163,22 @@ Default admin account is created on first startup:
 - Password: `changeme`
 
 Change these via `DEFAULT_ADMIN_EMAIL` and `DEFAULT_ADMIN_PASSWORD` environment variables.
+
+## Deployment
+
+### GCP Architecture
+
+| Component      | GCP Service                             | Why                                                      |
+| -------------- | --------------------------------------- | -------------------------------------------------------- |
+| cms-api        | Cloud Run                               | Stateless API, only pay when used                        |
+| discovery-api  | Cloud Run                               | Stateless API, scales automatically                      |
+| outbox-relay   | Compute Engine (Container-Optimized OS) | Needs to run continuously to poll the database           |
+| search-indexer | Compute Engine (Container-Optimized OS) | Needs to run continuously to process queue tasks         |
+| PostgreSQL     | Cloud SQL for PostgreSQL                | Managed database, handles backups and HA                 |
+| Redis          | Memorystore for Redis                   | Managed Redis with automatic failover                    |
+| Typesense      | Compute Engine (Managed Instance Group) | Needs persistent storage and low-latency, can auto-scale |
+| Secrets        | Secret Manager                          | Environment variables                                    |
+
+### TODO
+
+Should really create Terraform configs for this instead of clicking around in the console.
